@@ -243,6 +243,7 @@ var TStatusLogs = /*#__PURE__*/function () {
     value: function pushPressure() {
       var extras = this.rt.logDumpExtras.pressure();
       this.data.pressures.push(_objectSpread(_objectSpread({
+        id: uniqueID(),
         timestamp: new Date().getTime()
       }, extras), this.rt.status.pressure.getStatus()));
     }
@@ -258,7 +259,7 @@ var TStatusLogs = /*#__PURE__*/function () {
       var ua = new UAParser(req.headers['user-agent']);
       var route = this.rt.status.routes.getRoute(req);
       return _objectSpread(_objectSpread({
-        reqid: uniqueID(),
+        id: uniqueID(),
         timestamp: new Date().getTime(),
         graphql: this.graphql(req),
         url: req.originalUrl,

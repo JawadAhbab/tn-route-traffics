@@ -24,6 +24,7 @@ export class TStatusLogs {
   private pushPressure() {
     const extras = this.rt.logDumpExtras.pressure()
     this.data.pressures.push({
+      id: uniqueID(),
       timestamp: new Date().getTime(),
       ...extras,
       ...this.rt.status.pressure.getStatus(),
@@ -38,7 +39,7 @@ export class TStatusLogs {
     const ua = new UAParser(req.headers['user-agent'])
     const route = this.rt.status.routes.getRoute(req)
     return {
-      reqid: uniqueID(),
+      id: uniqueID(),
       timestamp: new Date().getTime(),
       graphql: this.graphql(req),
       url: req.originalUrl,

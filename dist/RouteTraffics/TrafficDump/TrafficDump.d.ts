@@ -4,12 +4,13 @@ export type TrafficDumpData<Extras extends {} = {}, PressureExtras extends {} = 
     visits: TraffisDumpVisit<VisitExtras>[];
 };
 export type TrafficDumpPressure<Extras extends {} = {}> = Extras & {
+    id: string;
     timestamp: number;
     queueing: number;
     waitTime: number;
 };
 export type TraffisDumpVisit<Extras extends {} = {}> = Extras & {
-    reqid: string;
+    id: string;
     timestamp: number;
     status: 'REJECTED' | 'ACCEPTED';
     graphql: boolean;
