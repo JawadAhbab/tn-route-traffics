@@ -240,6 +240,7 @@ var TStatusLogs = /*#__PURE__*/function () {
   }, {
     key: "pushPressure",
     value: function pushPressure() {
+      if (!this.pressure.count) return;
       this.pressures.push(_objectSpread(_objectSpread({
         id: uniqueID(),
         timestamp: new Date().getTime()

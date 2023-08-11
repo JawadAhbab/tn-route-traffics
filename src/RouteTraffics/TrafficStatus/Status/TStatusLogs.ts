@@ -34,6 +34,7 @@ export class TStatusLogs {
     this.pressure.waitTime += waitTime
   }
   private pushPressure() {
+    if (!this.pressure.count) return
     this.pressures.push({
       id: uniqueID(),
       timestamp: new Date().getTime(),
