@@ -1,5 +1,5 @@
-export { TrafficsDumpData } from './RouteTraffics/TrafficStatus/Status/TStatusLogs';
-export { TrafficsDumpPressure } from './RouteTraffics/TrafficStatus/Status/TStatusLogs';
-export { TrafficsDumpVisit } from './RouteTraffics/TrafficStatus/Status/TStatusLogs';
+export { TrafficDumpData } from './RouteTraffics/TrafficDump/TrafficDump';
+export { TrafficDumpPressure } from './RouteTraffics/TrafficDump/TrafficDump';
+export { TraffisDumpVisit } from './RouteTraffics/TrafficDump/TrafficDump';
 export { $routeTraffics } from './RouteTraffics/RouteTraffics';
 export { routeTrafficsMiddleware } from './RouteTrafficsMiddleware/RouteTrafficsMiddleware';

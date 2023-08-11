@@ -8,7 +8,11 @@ export interface RouteTrafficsOpts {
     excludes?: string[];
     logDump?: (dump: string) => void;
     logDumpInterval?: number | string;
-    logDumpExtras?: (req: Request, res: Response) => AnyObject;
+    logDumpExtras?: {
+        base?: () => AnyObject;
+        pressure?: () => AnyObject;
+        visit?: (req: Request, res: Response) => AnyObject;
+    };
 }
 export declare class TrafficOpts {
     protected opts: RouteTrafficsOpts;
@@ -18,5 +22,9 @@ export declare class TrafficOpts {
     get excludes(): string[];
     get logDump(): (dump: string) => void;
     get logDumpInterval(): string | number;
-    get logDumpExtras(): ((req: Request<import("express-serve-static-core").ParamsDictionary, any, any, import("qs").ParsedQs, Record<string, any>>, res: Response<any, Record<string, any>>) => AnyObject) | (() => void);
+    get logDumpExtras(): {
+        base: (() => AnyObject) | (() => null);
+        pressure: (() => AnyObject) | (() => null);
+        visit: ((req: Request<import("express-serve-static-core").ParamsDictionary, any, any, import("qs").ParsedQs, Record<string, any>>, res: Response<any, Record<string, any>>) => AnyObject) | (() => null);
+    };
 }

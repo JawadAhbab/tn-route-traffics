@@ -123,7 +123,18 @@ var TrafficOpts = /*#__PURE__*/function () {
   }, {
     key: "logDumpExtras",
     get: function get() {
-      return this.opts.logDumpExtras || function () {};
+      var _this$opts$logDumpExt, _this$opts$logDumpExt2, _this$opts$logDumpExt3;
+      return {
+        base: ((_this$opts$logDumpExt = this.opts.logDumpExtras) === null || _this$opts$logDumpExt === void 0 ? void 0 : _this$opts$logDumpExt.base) || function () {
+          return null;
+        },
+        pressure: ((_this$opts$logDumpExt2 = this.opts.logDumpExtras) === null || _this$opts$logDumpExt2 === void 0 ? void 0 : _this$opts$logDumpExt2.pressure) || function () {
+          return null;
+        },
+        visit: ((_this$opts$logDumpExt3 = this.opts.logDumpExtras) === null || _this$opts$logDumpExt3 === void 0 ? void 0 : _this$opts$logDumpExt3.visit) || function () {
+          return null;
+        }
+      };
     }
   }]);
   return TrafficOpts;
@@ -219,7 +230,8 @@ var TStatusLogs = /*#__PURE__*/function () {
   _createClass(TStatusLogs, [{
     key: "dump",
     value: function dump() {
-      var dump = JSON.stringify(this.data);
+      var extras = this.rt.logDumpExtras.base();
+      var dump = JSON.stringify(_objectSpread(_objectSpread({}, extras), this.data));
       this.data = {
         pressures: [],
         visits: []
@@ -229,9 +241,10 @@ var TStatusLogs = /*#__PURE__*/function () {
   }, {
     key: "pushPressure",
     value: function pushPressure() {
-      this.data.pressures.push(_objectSpread({
+      var extras = this.rt.logDumpExtras.pressure();
+      this.data.pressures.push(_objectSpread(_objectSpread({
         timestamp: new Date().getTime()
-      }, this.rt.status.pressure.getStatus()));
+      }, extras), this.rt.status.pressure.getStatus()));
     }
   }, {
     key: "graphql",
@@ -239,9 +252,9 @@ var TStatusLogs = /*#__PURE__*/function () {
       return req.originalUrl.startsWith('/graphql');
     }
   }, {
-    key: "commons",
-    value: function commons(req, res) {
-      var extras = this.rt.logDumpExtras(req, res);
+    key: "visitCommons",
+    value: function visitCommons(req, res) {
+      var extras = this.rt.logDumpExtras.visit(req, res);
       var ua = new UAParser(req.headers['user-agent']);
       var route = this.rt.status.routes.getRoute(req);
       return _objectSpread(_objectSpread({
@@ -265,7 +278,7 @@ var TStatusLogs = /*#__PURE__*/function () {
   }, {
     key: "pushRejectVisit",
     value: function pushRejectVisit(req, res) {
-      var commons = this.commons(req, res);
+      var commons = this.visitCommons(req, res);
       this.data.visits.push(_objectSpread(_objectSpread({}, commons), {}, {
         status: 'REJECTED',
         delay: 0,
@@ -275,7 +288,7 @@ var TStatusLogs = /*#__PURE__*/function () {
   }, {
     key: "pushVisit",
     value: function pushVisit(req, res, queuems, startms, closems) {
-      var commons = this.commons(req, res);
+      var commons = this.visitCommons(req, res);
       var delay = startms - queuems;
       var took = closems - startms;
       this.data.visits.push(_objectSpread(_objectSpread({}, commons), {}, {

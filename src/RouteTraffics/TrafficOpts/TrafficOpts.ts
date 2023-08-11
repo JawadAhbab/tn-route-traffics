@@ -7,7 +7,11 @@ export interface RouteTrafficsOpts {
   excludes?: string[]
   logDump?: (dump: string) => void
   logDumpInterval?: number | string
-  logDumpExtras?: (req: Request, res: Response) => AnyObject
+  logDumpExtras?: {
+    base?: () => AnyObject
+    pressure?: () => AnyObject
+    visit?: (req: Request, res: Response) => AnyObject
+  }
 }
 
 export class TrafficOpts {
@@ -32,6 +36,10 @@ export class TrafficOpts {
     return this.opts.logDumpInterval || '1m'
   }
   public get logDumpExtras() {
-    return this.opts.logDumpExtras || (() => {})
+    return {
+      base: this.opts.logDumpExtras?.base || (() => null),
+      pressure: this.opts.logDumpExtras?.pressure || (() => null),
+      visit: this.opts.logDumpExtras?.visit || (() => null),
+    }
   }
 }

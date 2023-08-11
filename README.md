@@ -9,7 +9,11 @@ app.use(
     logDumpInterval: '1m',
     unlockTime: '10m',
     logDump: dump => {...},
-    logDumpExtras: req => ({ user: req.user || null }),
+    logDumpExtras: {
+      base: () => ({}),
+      pressure: () => ({}),
+      visit: req => ({ user: req.user || null })
+    },
   })
 )
 ```
