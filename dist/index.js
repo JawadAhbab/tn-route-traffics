@@ -204,8 +204,14 @@ var TStatusLogs = /*#__PURE__*/function () {
     var _this3 = this;
     _classCallCheck(this, TStatusLogs);
     _defineProperty(this, "rt", void 0);
-    _defineProperty(this, "data", []);
+    _defineProperty(this, "data", {
+      pressures: [],
+      visits: []
+    });
     this.rt = rt;
+    setInterval(function () {
+      return _this3.pushPressure();
+    }, 1000);
     setInterval(function () {
       return _this3.dump();
     }, getMs(rt.logDumpInterval));
@@ -213,10 +219,24 @@ var TStatusLogs = /*#__PURE__*/function () {
   _createClass(TStatusLogs, [{
     key: "dump",
     value: function dump() {
-      if (!this.data.length) return;
       var dump = JSON.stringify(this.data);
-      this.data = [];
+      this.data = {
+        pressures: [],
+        visits: []
+      };
       this.rt.logDump(dump);
+    }
+  }, {
+    key: "pushPressure",
+    value: function pushPressure() {
+      this.data.pressures.push(_objectSpread({
+        timestamp: new Date().getTime()
+      }, this.rt.status.pressure.getStatus()));
+    }
+  }, {
+    key: "graphql",
+    value: function graphql(req) {
+      return req.originalUrl.startsWith('/graphql');
     }
   }, {
     key: "commons",
@@ -243,27 +263,22 @@ var TStatusLogs = /*#__PURE__*/function () {
       });
     }
   }, {
-    key: "graphql",
-    value: function graphql(req) {
-      return req.originalUrl.startsWith('/graphql');
-    }
-  }, {
-    key: "pushReject",
-    value: function pushReject(req, res) {
+    key: "pushRejectVisit",
+    value: function pushRejectVisit(req, res) {
       var commons = this.commons(req, res);
-      this.data.push(_objectSpread(_objectSpread({}, commons), {}, {
+      this.data.visits.push(_objectSpread(_objectSpread({}, commons), {}, {
         status: 'REJECTED',
         delay: 0,
         took: 0
       }));
     }
   }, {
-    key: "push",
-    value: function push(req, res, queuems, startms, closems) {
+    key: "pushVisit",
+    value: function pushVisit(req, res, queuems, startms, closems) {
       var commons = this.commons(req, res);
       var delay = startms - queuems;
       var took = closems - startms;
-      this.data.push(_objectSpread(_objectSpread({}, commons), {}, {
+      this.data.visits.push(_objectSpread(_objectSpread({}, commons), {}, {
         status: 'ACCEPTED',
         delay: delay,
         took: took
@@ -272,26 +287,25 @@ var TStatusLogs = /*#__PURE__*/function () {
   }]);
   return TStatusLogs;
 }();
-var TStatusQueue = /*#__PURE__*/function () {
-  function TStatusQueue(rt) {
-    _classCallCheck(this, TStatusQueue);
+var TStatusPressure = /*#__PURE__*/function () {
+  function TStatusPressure(rt) {
+    _classCallCheck(this, TStatusPressure);
     _defineProperty(this, "rt", void 0);
     this.rt = rt;
   }
-  _createClass(TStatusQueue, [{
+  _createClass(TStatusPressure, [{
     key: "getStatus",
     value: function getStatus() {
-      var waitings = this.rt.traffics.filter(function (t) {
+      var oldest = this.rt.traffics.find(function (t) {
         return !t.started;
       });
       return {
-        running: this.rt.traffics.length - waitings.length,
-        waiting: waitings.length,
-        waitTime: waitings.length ? new Date().getTime() - waitings[0].queuems : 0
+        queueing: this.rt.traffics.length,
+        waitTime: oldest ? new Date().getTime() - oldest.queuems : 0
       };
     }
   }]);
-  return TStatusQueue;
+  return TStatusPressure;
 }();
 var Route = /*#__PURE__*/function () {
   function Route(route) {
@@ -443,17 +457,17 @@ var TrafficStatus = /*#__PURE__*/function () {
     _defineProperty(this, "logs", void 0);
     _defineProperty(this, "delay", new TStatusDelay());
     _defineProperty(this, "traffic", new TStausTraffics());
-    _defineProperty(this, "queue", void 0);
     _defineProperty(this, "commons", new TStatusCommons());
+    _defineProperty(this, "pressure", void 0);
     _defineProperty(this, "routes", new TStatusRoutes());
-    this.queue = new TStatusQueue(rt);
+    this.pressure = new TStatusPressure(rt);
     this.logs = new TStatusLogs(rt);
   }
   _createClass(TrafficStatus, [{
     key: "onReject",
     value: function onReject(req, res) {
       this.traffic.reject();
-      this.logs.pushReject(req, res);
+      this.logs.pushRejectVisit(req, res);
     }
   }, {
     key: "onQueue",
@@ -469,13 +483,13 @@ var TrafficStatus = /*#__PURE__*/function () {
     key: "onClose",
     value: function onClose(req, res, queuems, startms, closems) {
       this.routes.push(req, res, startms, closems);
-      this.logs.push(req, res, queuems, startms, closems);
+      this.logs.pushVisit(req, res, queuems, startms, closems);
     }
   }, {
     key: "getStatus",
     value: function getStatus() {
       return _objectSpread(_objectSpread({}, this.commons.getStatus()), {}, {
-        queue: this.queue.getStatus(),
+        pressure: this.pressure.getStatus(),
         traffics: this.traffic.getStatus(),
         delay: this.delay.getStatus(),
         routes: this.routes.getStatus()

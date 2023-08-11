@@ -1,7 +1,16 @@
 import { Request, Response } from 'express';
 import UAParser from 'ua-parser-js';
 import { RouteTraffics } from '../../RouteTraffics';
-export type TrafficLog<Extras extends {} = {}> = Extras & {
+export type TrafficsDumpData = {
+    pressures: TrafficsDumpPressure[];
+    visits: TrafficsDumpVisit[];
+};
+export interface TrafficsDumpPressure {
+    timestamp: number;
+    queueing: number;
+    waitTime: number;
+}
+export type TrafficsDumpVisit<Extras extends {} = {}> = Extras & {
     reqid: string;
     timestamp: number;
     status: 'REJECTED' | 'ACCEPTED';
@@ -25,8 +34,9 @@ export declare class TStatusLogs {
     private data;
     constructor(rt: RouteTraffics);
     private dump;
-    private commons;
+    private pushPressure;
     private graphql;
-    pushReject(req: Request, res: Response): void;
-    push(req: Request, res: Response, queuems: number, startms: number, closems: number): void;
+    private commons;
+    pushRejectVisit(req: Request, res: Response): void;
+    pushVisit(req: Request, res: Response, queuems: number, startms: number, closems: number): void;
 }

@@ -1,12 +1,13 @@
 import { Request, Response } from 'express';
 import { RouteTraffics } from '../RouteTraffics';
+import { TStatusPressure } from './Status/TStatusPressure';
 import { TStatusRoutes } from './Status/TStatusRoutes';
 export declare class TrafficStatus {
     private logs;
     private delay;
     private traffic;
-    private queue;
     private commons;
+    pressure: TStatusPressure;
     routes: TStatusRoutes;
     constructor(rt: RouteTraffics);
     onReject(req: Request, res: Response): void;
@@ -14,9 +15,8 @@ export declare class TrafficStatus {
     onStart(queuems: number, startms: number): void;
     onClose(req: Request, res: Response, queuems: number, startms: number, closems: number): void;
     getStatus(): {
-        queue: {
-            running: number;
-            waiting: number;
+        pressure: {
+            queueing: number;
             waitTime: number;
         };
         traffics: {

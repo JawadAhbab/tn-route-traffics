@@ -1,10 +1,9 @@
 import { RouteTraffics } from '../../RouteTraffics';
-export declare class TStatusQueue {
+export declare class TStatusPressure {
     private rt;
     constructor(rt: RouteTraffics);
     getStatus(): {
-        running: number;
-        waiting: number;
+        queueing: number;
         waitTime: number;
     };
 }
