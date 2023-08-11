@@ -1,9 +1,14 @@
 import { RouteTraffics } from '../../RouteTraffics';
+type Record = {
+    timestamp: number;
+    queueing: number;
+    waitTime: number;
+};
 export declare class TStatusPressure {
     private rt;
+    private records;
     constructor(rt: RouteTraffics);
-    getStatus(): {
-        queueing: number;
-        waitTime: number;
-    };
+    private record;
+    getStatus(): Record[];
 }
+export {};

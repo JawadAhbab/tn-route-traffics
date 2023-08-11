@@ -6,8 +6,6 @@ export declare class TStatusLogs {
     private pressures;
     constructor(rt: RouteTraffics);
     private dump;
-    private pressure;
-    private logPressure;
     private pushPressure;
     private graphql;
     private visitCommons;

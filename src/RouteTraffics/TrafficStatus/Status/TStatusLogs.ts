@@ -12,7 +12,6 @@ export class TStatusLogs {
   private pressures: TrafficDumpPressure[] = []
   constructor(rt: RouteTraffics) {
     this.rt = rt
-    setInterval(() => this.logPressure(), ms('1s'))
     setInterval(() => this.pushPressure(), ms('1m'))
     setInterval(() => this.dump(), getMs(rt.logDumpInterval))
   }
@@ -26,25 +25,16 @@ export class TStatusLogs {
     this.rt.logDump(dump)
   }
 
-  private pressure = { count: 0, queueing: 0, waitTime: 0 }
-  private logPressure() {
-    const { queueing, waitTime } = this.rt.status.pressure.getStatus()
-    this.pressure.count += 1
-    this.pressure.queueing += queueing
-    this.pressure.waitTime += waitTime
-  }
   private pushPressure() {
-    if (!this.pressure.count) return
+    const records = this.rt.status.pressure.getStatus().slice(0, 60)
+    if (records.every(record => !record.queueing)) return
     this.pressures.push({
       id: uniqueID(),
       timestamp: new Date().getTime(),
       ...this.rt.logDumpExtras.pressure(),
-      queuePerSec: this.pressure.queueing / this.pressure.count,
-      aveWaitTime: this.pressure.waitTime / this.pressure.count,
+      queuePerSec: records.reduce((a, b) => a + b.queueing, 0) / records.length,
+      aveWaitTime: records.reduce((a, b) => a + b.waitTime, 0) / records.length,
     })
-    this.pressure.count = 0
-    this.pressure.queueing = 0
-    this.pressure.waitTime = 0
   }
 
   private graphql(req: Request) {
@@ -53,7 +43,7 @@ export class TStatusLogs {
   private visitCommons(req: Request, res: Response) {
     const extras = this.rt.logDumpExtras.visit(req, res)
     const ua = new UAParser(req.headers['user-agent'])
-    const route = this.rt.status.routes.getRoute(req)
+    const route = this.rt.status.traffics.getRoute(req)
     return {
       id: uniqueID(),
       timestamp: new Date().getTime(),

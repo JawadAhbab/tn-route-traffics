@@ -1,12 +1,16 @@
 import { Request, Response } from 'express';
 import { AnyObject } from 'tn-typescript';
-export declare class TStatusRoutes {
+export declare class TStatusTraffics {
+    private served;
+    private lost;
     private routes;
     private unknowns;
-    push(req: Request, res: Response, startms: number, closems: number): number | undefined;
+    pushServed(req: Request, res: Response, startms: number, closems: number): number | undefined;
+    pushLoss(): void;
     getRoute(req: Request): string | null;
     getStatus(): {
-        counts: number;
+        served: number;
+        lost: number;
         average: number;
         cputime: number;
         routes: AnyObject;

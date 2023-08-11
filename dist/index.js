@@ -198,15 +198,7 @@ var TStatusLogs = /*#__PURE__*/function () {
     _defineProperty(this, "rt", void 0);
     _defineProperty(this, "visits", []);
     _defineProperty(this, "pressures", []);
-    _defineProperty(this, "pressure", {
-      count: 0,
-      queueing: 0,
-      waitTime: 0
-    });
     this.rt = rt;
-    setInterval(function () {
-      return _this3.logPressure();
-    }, ms('1s'));
     setInterval(function () {
       return _this3.pushPressure();
     }, ms('1m'));
@@ -228,29 +220,23 @@ var TStatusLogs = /*#__PURE__*/function () {
       this.rt.logDump(dump);
     }
   }, {
-    key: "logPressure",
-    value: function logPressure() {
-      var _this$rt$status$press = this.rt.status.pressure.getStatus(),
-        queueing = _this$rt$status$press.queueing,
-        waitTime = _this$rt$status$press.waitTime;
-      this.pressure.count += 1;
-      this.pressure.queueing += queueing;
-      this.pressure.waitTime += waitTime;
-    }
-  }, {
     key: "pushPressure",
     value: function pushPressure() {
-      if (!this.pressure.count) return;
+      var records = this.rt.status.pressure.getStatus().slice(0, 60);
+      if (records.every(function (record) {
+        return !record.queueing;
+      })) return;
       this.pressures.push(_objectSpread(_objectSpread({
         id: uniqueID(),
         timestamp: new Date().getTime()
       }, this.rt.logDumpExtras.pressure()), {}, {
-        queuePerSec: this.pressure.queueing / this.pressure.count,
-        aveWaitTime: this.pressure.waitTime / this.pressure.count
+        queuePerSec: records.reduce(function (a, b) {
+          return a + b.queueing;
+        }, 0) / records.length,
+        aveWaitTime: records.reduce(function (a, b) {
+          return a + b.waitTime;
+        }, 0) / records.length
       }));
-      this.pressure.count = 0;
-      this.pressure.queueing = 0;
-      this.pressure.waitTime = 0;
     }
   }, {
     key: "graphql",
@@ -262,7 +248,7 @@ var TStatusLogs = /*#__PURE__*/function () {
     value: function visitCommons(req, res) {
       var extras = this.rt.logDumpExtras.visit(req, res);
       var ua = new UAParser(req.headers['user-agent']);
-      var route = this.rt.status.routes.getRoute(req);
+      var route = this.rt.status.traffics.getRoute(req);
       return _objectSpread(_objectSpread({
         id: uniqueID(),
         timestamp: new Date().getTime(),
@@ -308,20 +294,35 @@ var TStatusLogs = /*#__PURE__*/function () {
 }();
 var TStatusPressure = /*#__PURE__*/function () {
   function TStatusPressure(rt) {
+    var _this4 = this;
     _classCallCheck(this, TStatusPressure);
     _defineProperty(this, "rt", void 0);
+    _defineProperty(this, "records", []);
     this.rt = rt;
+    setInterval(function () {
+      return _this4.record();
+    }, ms('1s'));
   }
   _createClass(TStatusPressure, [{
-    key: "getStatus",
-    value: function getStatus() {
+    key: "record",
+    value: function record() {
       var oldest = this.rt.traffics.find(function (t) {
         return !t.started;
       });
-      return {
-        queueing: this.rt.traffics.length,
-        waitTime: oldest ? new Date().getTime() - oldest.queuems : 0
-      };
+      var timestamp = new Date().getTime();
+      var queueing = this.rt.traffics.length;
+      var waitTime = oldest ? new Date().getTime() - oldest.queuems : 0;
+      this.records.unshift({
+        timestamp: timestamp,
+        queueing: queueing,
+        waitTime: waitTime
+      });
+      this.records.splice(300);
+    }
+  }, {
+    key: "getStatus",
+    value: function getStatus() {
+      return this.records;
     }
   }]);
   return TStatusPressure;
@@ -388,20 +389,28 @@ var Unknowns = /*#__PURE__*/function () {
   }]);
   return Unknowns;
 }();
-var TStatusRoutes = /*#__PURE__*/function () {
-  function TStatusRoutes() {
-    _classCallCheck(this, TStatusRoutes);
+var TStatusTraffics = /*#__PURE__*/function () {
+  function TStatusTraffics() {
+    _classCallCheck(this, TStatusTraffics);
+    _defineProperty(this, "served", 0);
+    _defineProperty(this, "lost", 0);
     _defineProperty(this, "routes", {});
     _defineProperty(this, "unknowns", new Unknowns());
   }
-  _createClass(TStatusRoutes, [{
-    key: "push",
-    value: function push(req, res, startms, closems) {
+  _createClass(TStatusTraffics, [{
+    key: "pushServed",
+    value: function pushServed(req, res, startms, closems) {
+      ++this.served;
       var routename = this.getRoute(req);
       if (!routename) return this.unknowns.push(req.originalUrl);
       var route = this.routes[routename];
       if (!route) this.routes[routename] = new Route(routename);
       this.routes[routename].push(closems - startms, res.statusCode);
+    }
+  }, {
+    key: "pushLoss",
+    value: function pushLoss() {
+      ++this.lost;
     }
   }, {
     key: "getRoute",
@@ -413,6 +422,8 @@ var TStatusRoutes = /*#__PURE__*/function () {
   }, {
     key: "getStatus",
     value: function getStatus() {
+      var served = this.served,
+        lost = this.lost;
       var rs = Object.entries(this.routes).map(function (_ref2) {
         var _ref3 = _slicedToArray(_ref2, 2),
           _ = _ref3[0],
@@ -432,7 +443,8 @@ var TStatusRoutes = /*#__PURE__*/function () {
         return routes[route.route] = route.getStatus();
       });
       return {
-        counts: counts,
+        served: served,
+        lost: lost,
         average: average,
         cputime: cputime,
         routes: routes,
@@ -440,59 +452,28 @@ var TStatusRoutes = /*#__PURE__*/function () {
       };
     }
   }]);
-  return TStatusRoutes;
-}();
-var TStausTraffics = /*#__PURE__*/function () {
-  function TStausTraffics() {
-    _classCallCheck(this, TStausTraffics);
-    _defineProperty(this, "acceptCount", 0);
-    _defineProperty(this, "rejectCount", 0);
-  }
-  _createClass(TStausTraffics, [{
-    key: "accept",
-    value: function accept() {
-      this.acceptCount += 1;
-    }
-  }, {
-    key: "reject",
-    value: function reject() {
-      this.rejectCount += 1;
-    }
-  }, {
-    key: "getStatus",
-    value: function getStatus() {
-      return {
-        served: this.acceptCount,
-        lost: this.rejectCount,
-        percentage: this.rejectCount / (this.acceptCount + this.rejectCount) * 100
-      };
-    }
-  }]);
-  return TStausTraffics;
+  return TStatusTraffics;
 }();
 var TrafficStatus = /*#__PURE__*/function () {
   function TrafficStatus(rt) {
     _classCallCheck(this, TrafficStatus);
     _defineProperty(this, "logs", void 0);
     _defineProperty(this, "delay", new TStatusDelay());
-    _defineProperty(this, "traffic", new TStausTraffics());
     _defineProperty(this, "commons", new TStatusCommons());
     _defineProperty(this, "pressure", void 0);
-    _defineProperty(this, "routes", new TStatusRoutes());
+    _defineProperty(this, "traffics", new TStatusTraffics());
     this.pressure = new TStatusPressure(rt);
     this.logs = new TStatusLogs(rt);
   }
   _createClass(TrafficStatus, [{
     key: "onReject",
     value: function onReject(req, res) {
-      this.traffic.reject();
+      this.traffics.pushLoss();
       this.logs.pushRejectVisit(req, res);
     }
   }, {
     key: "onQueue",
-    value: function onQueue() {
-      this.traffic.accept();
-    }
+    value: function onQueue() {}
   }, {
     key: "onStart",
     value: function onStart(queuems, startms) {
@@ -501,17 +482,16 @@ var TrafficStatus = /*#__PURE__*/function () {
   }, {
     key: "onClose",
     value: function onClose(req, res, queuems, startms, closems) {
-      this.routes.push(req, res, startms, closems);
+      this.traffics.pushServed(req, res, startms, closems);
       this.logs.pushVisit(req, res, queuems, startms, closems);
     }
   }, {
     key: "getStatus",
     value: function getStatus() {
       return _objectSpread(_objectSpread({}, this.commons.getStatus()), {}, {
-        pressure: this.pressure.getStatus(),
-        traffics: this.traffic.getStatus(),
         delay: this.delay.getStatus(),
-        routes: this.routes.getStatus()
+        traffics: this.traffics.getStatus(),
+        pressure: this.pressure.getStatus()
       });
     }
   }]);
@@ -521,15 +501,15 @@ var RouteTraffics = /*#__PURE__*/function (_TrafficOpts) {
   _inherits(RouteTraffics, _TrafficOpts);
   var _super = _createSuper(RouteTraffics);
   function RouteTraffics() {
-    var _this4;
+    var _this5;
     _classCallCheck(this, RouteTraffics);
     for (var _len = arguments.length, args = new Array(_len), _key = 0; _key < _len; _key++) {
       args[_key] = arguments[_key];
     }
-    _this4 = _super.call.apply(_super, [this].concat(args));
-    _defineProperty(_assertThisInitialized(_this4), "traffics", []);
-    _defineProperty(_assertThisInitialized(_this4), "status", void 0);
-    return _this4;
+    _this5 = _super.call.apply(_super, [this].concat(args));
+    _defineProperty(_assertThisInitialized(_this5), "traffics", []);
+    _defineProperty(_assertThisInitialized(_this5), "status", void 0);
+    return _this5;
   }
   _createClass(RouteTraffics, [{
     key: "begin",

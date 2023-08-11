@@ -51,16 +51,22 @@ class Unknowns {
   }
 }
 
-export class TStatusRoutes {
+export class TStatusTraffics {
+  private served = 0
+  private lost = 0
   private routes: ObjectOf<Route> = {}
   private unknowns = new Unknowns()
 
-  public push(req: Request, res: Response, startms: number, closems: number) {
+  public pushServed(req: Request, res: Response, startms: number, closems: number) {
+    ++this.served
     const routename = this.getRoute(req)
     if (!routename) return this.unknowns.push(req.originalUrl)
     const route = this.routes[routename]
     if (!route) this.routes[routename] = new Route(routename)
     this.routes[routename].push(closems - startms, res.statusCode)
+  }
+  public pushLoss() {
+    ++this.lost
   }
 
   public getRoute(req: Request): string | null {
@@ -69,6 +75,7 @@ export class TStatusRoutes {
   }
 
   public getStatus() {
+    const { served, lost } = this
     const rs = Object.entries(this.routes).map(([_, route]) => route)
     const counts = rs.reduce((a, b) => a + b.count, 0)
     const cputime = rs.reduce((a, b) => a + b.cputime, 0)
@@ -76,6 +83,6 @@ export class TStatusRoutes {
     const unknowns = this.unknowns.getStatus()
     const routes: AnyObject = {}
     rs.forEach(route => (routes[route.route] = route.getStatus()))
-    return { counts, average, cputime, routes, unknowns }
+    return { served, lost, average, cputime, routes, unknowns }
   }
 }
