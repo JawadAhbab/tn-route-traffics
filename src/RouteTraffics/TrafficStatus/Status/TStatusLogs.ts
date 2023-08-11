@@ -15,6 +15,7 @@ export class TStatusLogs {
   }
 
   private dump() {
+    if (!this.data.visits.length) return
     const extras = this.rt.logDumpExtras.base()
     const dump = JSON.stringify({ ...extras, ...this.data })
     this.data = { pressures: [], visits: [] }

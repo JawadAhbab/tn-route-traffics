@@ -230,6 +230,7 @@ var TStatusLogs = /*#__PURE__*/function () {
   _createClass(TStatusLogs, [{
     key: "dump",
     value: function dump() {
+      if (!this.data.visits.length) return;
       var extras = this.rt.logDumpExtras.base();
       var dump = JSON.stringify(_objectSpread(_objectSpread({}, extras), this.data));
       this.data = {
