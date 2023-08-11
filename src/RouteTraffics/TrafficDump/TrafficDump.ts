@@ -4,17 +4,17 @@ export type TrafficDumpData<
   VisitExtras extends {} = {}
 > = Extras & {
   pressures: TrafficDumpPressure<PressureExtras>[]
-  visits: TraffisDumpVisit<VisitExtras>[]
+  visits: TrafficDumpVisit<VisitExtras>[]
 }
 
 export type TrafficDumpPressure<Extras extends {} = {}> = Extras & {
   id: string
   timestamp: number
-  queueing: number
-  waitTime: number
+  queuePerSec: number
+  aveWaitTime: number
 }
 
-export type TraffisDumpVisit<Extras extends {} = {}> = Extras & {
+export type TrafficDumpVisit<Extras extends {} = {}> = Extras & {
   id: string
   timestamp: number
   status: 'REJECTED' | 'ACCEPTED'

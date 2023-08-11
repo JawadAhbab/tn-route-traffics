@@ -2,9 +2,12 @@ import { Request, Response } from 'express';
 import { RouteTraffics } from '../../RouteTraffics';
 export declare class TStatusLogs {
     private rt;
-    private data;
+    private visits;
+    private pressures;
     constructor(rt: RouteTraffics);
     private dump;
+    private pressure;
+    private logPressure;
     private pushPressure;
     private graphql;
     private visitCommons;

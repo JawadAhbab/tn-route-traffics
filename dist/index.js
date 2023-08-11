@@ -196,14 +196,20 @@ var TStatusLogs = /*#__PURE__*/function () {
     var _this3 = this;
     _classCallCheck(this, TStatusLogs);
     _defineProperty(this, "rt", void 0);
-    _defineProperty(this, "data", {
-      pressures: [],
-      visits: []
+    _defineProperty(this, "visits", []);
+    _defineProperty(this, "pressures", []);
+    _defineProperty(this, "pressure", {
+      count: 0,
+      queueing: 0,
+      waitTime: 0
     });
     this.rt = rt;
     setInterval(function () {
+      return _this3.logPressure();
+    }, ms('1s'));
+    setInterval(function () {
       return _this3.pushPressure();
-    }, 1000);
+    }, ms('1m'));
     setInterval(function () {
       return _this3.dump();
     }, getMs(rt.logDumpInterval));
@@ -211,23 +217,39 @@ var TStatusLogs = /*#__PURE__*/function () {
   _createClass(TStatusLogs, [{
     key: "dump",
     value: function dump() {
-      if (!this.data.visits.length) return;
+      if (!this.visits.length && !this.pressures.length) return;
       var extras = this.rt.logDumpExtras.base();
-      var dump = JSON.stringify(_objectSpread(_objectSpread({}, extras), this.data));
-      this.data = {
-        pressures: [],
-        visits: []
-      };
+      var dump = JSON.stringify(_objectSpread(_objectSpread({}, extras), {}, {
+        pressures: this.pressures,
+        visits: this.visits
+      }));
+      this.visits = [];
+      this.pressures = [];
       this.rt.logDump(dump);
+    }
+  }, {
+    key: "logPressure",
+    value: function logPressure() {
+      var _this$rt$status$press = this.rt.status.pressure.getStatus(),
+        queueing = _this$rt$status$press.queueing,
+        waitTime = _this$rt$status$press.waitTime;
+      this.pressure.count += 1;
+      this.pressure.queueing += queueing;
+      this.pressure.waitTime += waitTime;
     }
   }, {
     key: "pushPressure",
     value: function pushPressure() {
-      var extras = this.rt.logDumpExtras.pressure();
-      this.data.pressures.push(_objectSpread(_objectSpread({
+      this.pressures.push(_objectSpread(_objectSpread({
         id: uniqueID(),
         timestamp: new Date().getTime()
-      }, extras), this.rt.status.pressure.getStatus()));
+      }, this.rt.logDumpExtras.pressure()), {}, {
+        queuePerSec: this.pressure.queueing / this.pressure.count,
+        aveWaitTime: this.pressure.waitTime / this.pressure.count
+      }));
+      this.pressure.count = 0;
+      this.pressure.queueing = 0;
+      this.pressure.waitTime = 0;
     }
   }, {
     key: "graphql",
@@ -262,7 +284,7 @@ var TStatusLogs = /*#__PURE__*/function () {
     key: "pushRejectVisit",
     value: function pushRejectVisit(req, res) {
       var commons = this.visitCommons(req, res);
-      this.data.visits.push(_objectSpread(_objectSpread({}, commons), {}, {
+      this.visits.push(_objectSpread(_objectSpread({}, commons), {}, {
         status: 'REJECTED',
         delay: 0,
         took: 0
@@ -274,7 +296,7 @@ var TStatusLogs = /*#__PURE__*/function () {
       var commons = this.visitCommons(req, res);
       var delay = startms - queuems;
       var took = closems - startms;
-      this.data.visits.push(_objectSpread(_objectSpread({}, commons), {}, {
+      this.visits.push(_objectSpread(_objectSpread({}, commons), {}, {
         status: 'ACCEPTED',
         delay: delay,
         took: took
