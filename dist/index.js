@@ -11,12 +11,15 @@ var _createClass = require("@babel/runtime/helpers/createClass");
 var _defineProperty = require("@babel/runtime/helpers/defineProperty");
 var common = require('@nestjs/common');
 var ms = require('ms');
+var tnValidate = require('tn-validate');
 var tnCapitalize = require('tn-capitalize');
 var tnCase = require('tn-case');
 var ung = require('unique-names-generator');
-var tnValidate = require('tn-validate');
 var UAParser = require('ua-parser-js');
 var tnUniqid = require('tn-uniqid');
+var getMs = function getMs(time) {
+  return tnValidate.isNumber(time) ? time : ms(time);
+};
 var Traffic = /*#__PURE__*/function () {
   function Traffic(rt, _ref) {
     var _this = this;
@@ -54,7 +57,7 @@ var Traffic = /*#__PURE__*/function () {
       this.rt.status.onStart(this.queuems, this.startms);
       this.timeouts.push(setTimeout(function () {
         return _this2.unlock();
-      }, this.rt.unlockTime));
+      }, getMs(this.rt.unlockTime)));
       this.timeouts.push(setTimeout(function () {
         return _this2.close();
       }, ms('10m')));
@@ -203,10 +206,9 @@ var TStatusLogs = /*#__PURE__*/function () {
     _defineProperty(this, "rt", void 0);
     _defineProperty(this, "data", []);
     this.rt = rt;
-    var interval = tnValidate.isNumber(rt.logDumpInterval) ? rt.logDumpInterval : ms(rt.logDumpInterval);
     setInterval(function () {
       return _this3.dump();
-    }, interval);
+    }, getMs(rt.logDumpInterval));
   }
   _createClass(TStatusLogs, [{
     key: "dump",

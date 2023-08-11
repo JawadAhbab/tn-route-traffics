@@ -3,7 +3,7 @@ import { AnyObject } from 'tn-typescript'
 export interface RouteTrafficsOpts {
   concurrency?: number
   maxQueue?: number
-  unlockTime?: number
+  unlockTime?: number | string
   excludes?: string[]
   logDump?: (dump: string) => void
   logDumpInterval?: number | string

@@ -1,7 +1,6 @@
 import { Request, Response } from 'express'
-import ms from 'ms'
-import { isNumber } from 'tn-validate'
 import UAParser from 'ua-parser-js'
+import { getMs } from '../../../accessories/getMs'
 import { uniqueID } from '../../../accessories/uniqueID'
 import { RouteTraffics } from '../../RouteTraffics'
 export type TrafficLog<Extras extends {} = {}> = Extras & {
@@ -29,8 +28,7 @@ export class TStatusLogs {
   private data: TrafficLog[] = []
   constructor(rt: RouteTraffics) {
     this.rt = rt
-    const interval = isNumber(rt.logDumpInterval) ? rt.logDumpInterval : ms(rt.logDumpInterval)
-    setInterval(() => this.dump(), interval)
+    setInterval(() => this.dump(), getMs(rt.logDumpInterval))
   }
 
   private dump() {

@@ -1,6 +1,7 @@
 import { Request, Response } from 'express'
 import ms from 'ms'
 import { Func } from 'tn-typescript'
+import { getMs } from '../../accessories/getMs'
 import { RouteTraffics } from '../RouteTraffics'
 export type TrafficProps = { req: Request; res: Response; next: Func }
 
@@ -31,7 +32,7 @@ export class Traffic {
     this.started = true
     this.next()
     this.rt.status.onStart(this.queuems, this.startms)
-    this.timeouts.push(setTimeout(() => this.unlock(), this.rt.unlockTime))
+    this.timeouts.push(setTimeout(() => this.unlock(), getMs(this.rt.unlockTime)))
     this.timeouts.push(setTimeout(() => this.close(), ms('10m')))
   }
 
