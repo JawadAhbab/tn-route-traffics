@@ -37,4 +37,4 @@ export class RouteTraffics extends TrafficOpts {
   }
 }
 
-export const $routeTraffic = new RouteTraffics()
+export const $routeTraffics = new RouteTraffics()

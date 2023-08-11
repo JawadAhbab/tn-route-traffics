@@ -537,16 +537,17 @@ var RouteTraffics = /*#__PURE__*/function (_TrafficOpts) {
   }]);
   return RouteTraffics;
 }(TrafficOpts);
-var $routeTraffic = new RouteTraffics();
-var routeTrafficMiddleware = function routeTrafficMiddleware() {
+var $routeTraffics = new RouteTraffics();
+var routeTrafficsMiddleware = function routeTrafficsMiddleware() {
   var opts = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-  $routeTraffic.begin(opts);
+  $routeTraffics.begin(opts);
   return function (req, res, next) {
-    $routeTraffic.pushTraffic({
+    $routeTraffics.pushTraffic({
       req: req,
       res: res,
       next: next
     });
   };
 };
-exports.routeTrafficMiddleware = routeTrafficMiddleware;
+exports.$routeTraffics = $routeTraffics;
+exports.routeTrafficsMiddleware = routeTrafficsMiddleware;
