@@ -1,42 +1,314 @@
 'use strict';
 
-var _typeof = require("@babel/runtime/helpers/typeof");
+var _assertThisInitialized = require("@babel/runtime/helpers/assertThisInitialized");
+var _inherits = require("@babel/runtime/helpers/inherits");
+var _createSuper = require("@babel/runtime/helpers/createSuper");
+var _slicedToArray = require("@babel/runtime/helpers/slicedToArray");
 var _objectSpread = require("@babel/runtime/helpers/objectSpread2");
 var _toConsumableArray = require("@babel/runtime/helpers/toConsumableArray");
-var _slicedToArray = require("@babel/runtime/helpers/slicedToArray");
 var _classCallCheck = require("@babel/runtime/helpers/classCallCheck");
 var _createClass = require("@babel/runtime/helpers/createClass");
 var _defineProperty = require("@babel/runtime/helpers/defineProperty");
-var ms = require('pretty-ms');
-var onHeaders = require('on-headers');
-var tnValidate = require('tn-validate');
 var common = require('@nestjs/common');
-var core = require('@nestjs/core');
-var platformExpress = require('@nestjs/platform-express');
-var sha = require('crypto-js/sha256');
-var ms$1 = require('ms');
-
-// TODO remove all ms() when visual status page is ready
-var Status = /*#__PURE__*/function () {
-  function Status(route) {
-    _classCallCheck(this, Status);
+var ms = require('ms');
+var tnCapitalize = require('tn-capitalize');
+var tnCase = require('tn-case');
+var ung = require('unique-names-generator');
+var tnValidate = require('tn-validate');
+var UAParser = require('ua-parser-js');
+var tnUniqid = require('tn-uniqid');
+var Traffic = /*#__PURE__*/function () {
+  function Traffic(rt, _ref) {
+    var _this = this;
+    var req = _ref.req,
+      res = _ref.res,
+      next = _ref.next;
+    _classCallCheck(this, Traffic);
+    _defineProperty(this, "rt", void 0);
+    _defineProperty(this, "queuems", new Date().getTime());
+    _defineProperty(this, "startms", void 0);
+    _defineProperty(this, "closems", void 0);
+    _defineProperty(this, "req", void 0);
+    _defineProperty(this, "res", void 0);
+    _defineProperty(this, "next", void 0);
+    _defineProperty(this, "started", false);
+    _defineProperty(this, "closed", false);
+    _defineProperty(this, "unlocked", false);
+    _defineProperty(this, "timeouts", []);
+    this.rt = rt;
+    this.req = req;
+    this.res = res;
+    this.next = next;
+    this.rt.status.onQueue();
+    this.res.once('close', function () {
+      return _this.close();
+    });
+  }
+  _createClass(Traffic, [{
+    key: "start",
+    value: function start() {
+      var _this2 = this;
+      this.startms = new Date().getTime();
+      this.started = true;
+      this.next();
+      this.rt.status.onStart(this.queuems, this.startms);
+      this.timeouts.push(setTimeout(function () {
+        return _this2.unlock();
+      }, this.rt.unlockTime));
+      this.timeouts.push(setTimeout(function () {
+        return _this2.close();
+      }, ms('10m')));
+    }
+  }, {
+    key: "unlock",
+    value: function unlock() {
+      this.unlocked = true;
+      this.rt.check();
+    }
+  }, {
+    key: "close",
+    value: function close() {
+      if (this.closed) return;
+      this.closems = new Date().getTime();
+      this.closed = true;
+      this.rt.status.onClose(this.req, this.res, this.queuems, this.startms, this.closems);
+      this.rt.check();
+      this.timeouts.forEach(function (timeout) {
+        return clearTimeout(timeout);
+      });
+    }
+  }]);
+  return Traffic;
+}();
+var TrafficOpts = /*#__PURE__*/function () {
+  function TrafficOpts() {
+    _classCallCheck(this, TrafficOpts);
+    _defineProperty(this, "opts", {});
+  }
+  _createClass(TrafficOpts, [{
+    key: "concurrency",
+    get: function get() {
+      return this.opts.concurrency || 6;
+    }
+  }, {
+    key: "maxQueue",
+    get: function get() {
+      return this.opts.maxQueue || 10000;
+    }
+  }, {
+    key: "unlockTime",
+    get: function get() {
+      return this.opts.unlockTime || 600000;
+    }
+  }, {
+    key: "excludes",
+    get: function get() {
+      return this.opts.excludes || [];
+    }
+  }, {
+    key: "logDump",
+    get: function get() {
+      return this.opts.logDump || function () {
+        return null;
+      };
+    }
+  }, {
+    key: "logDumpInterval",
+    get: function get() {
+      return this.opts.logDumpInterval || '1m';
+    }
+  }, {
+    key: "logDumpExtras",
+    get: function get() {
+      return this.opts.logDumpExtras || function () {};
+    }
+  }]);
+  return TrafficOpts;
+}();
+var stime = new Date().getTime();
+var dic = [];
+var dicadd = function dicadd(a) {
+  return a.map(function (e) {
+    return dic.push.apply(dic, _toConsumableArray(e.split(/[ -]/g).filter(function (i) {
+      return i.length > 2;
+    })));
+  });
+};
+dicadd([ung.countries, ung.animals, ung.adjectives, ung.colors, ung.languages].flat());
+var uniqueName = function uniqueName(podname) {
+  var name = ung.uniqueNamesGenerator({
+    dictionaries: [dic, dic],
+    seed: podname
+  });
+  return tnCapitalize.capitalize(tnCase.spaceCase(name));
+};
+var TStatusCommons = /*#__PURE__*/function () {
+  function TStatusCommons() {
+    _classCallCheck(this, TStatusCommons);
+  }
+  _createClass(TStatusCommons, [{
+    key: "getStatus",
+    value: function getStatus() {
+      var podname = process.env.HOSTNAME || 'unknown';
+      return {
+        name: uniqueName(podname),
+        podname: podname,
+        age: new Date().getTime() - stime
+      };
+    }
+  }]);
+  return TStatusCommons;
+}();
+var TStatusDelay = /*#__PURE__*/function () {
+  function TStatusDelay() {
+    _classCallCheck(this, TStatusDelay);
+    _defineProperty(this, "startCount", 0);
+    _defineProperty(this, "delayCount", 0);
+    _defineProperty(this, "delayMax", 0);
+    _defineProperty(this, "delayTotal", 0);
+  }
+  _createClass(TStatusDelay, [{
+    key: "push",
+    value: function push(queuems, startms) {
+      this.startCount += 1;
+      var delay = startms - queuems;
+      if (delay > 100) {
+        this.delayCount += 1;
+        this.delayTotal += delay;
+        this.delayMax = Math.max(this.delayMax, delay);
+      }
+    }
+  }, {
+    key: "getStatus",
+    value: function getStatus() {
+      return {
+        count: this.delayCount,
+        percentage: this.delayCount / this.startCount * 100,
+        max: this.delayMax,
+        ave: this.delayTotal / this.delayCount,
+        total: this.delayTotal
+      };
+    }
+  }]);
+  return TStatusDelay;
+}();
+var uniqueID = tnUniqid.uniqueGetter({
+  chars: ['A-Z', '0-9'],
+  length: 15
+});
+var TStatusLogs = /*#__PURE__*/function () {
+  function TStatusLogs(rt) {
+    var _this3 = this;
+    _classCallCheck(this, TStatusLogs);
+    _defineProperty(this, "rt", void 0);
+    _defineProperty(this, "data", []);
+    this.rt = rt;
+    var interval = tnValidate.isNumber(rt.logDumpInterval) ? rt.logDumpInterval : ms(rt.logDumpInterval);
+    setInterval(function () {
+      return _this3.dump();
+    }, interval);
+  }
+  _createClass(TStatusLogs, [{
+    key: "dump",
+    value: function dump() {
+      if (!this.data.length) return;
+      var dump = JSON.stringify(this.data);
+      this.data = [];
+      this.rt.logDump(dump);
+    }
+  }, {
+    key: "commons",
+    value: function commons(req, res) {
+      var extras = this.rt.logDumpExtras(req, res);
+      var ua = new UAParser(req.headers['user-agent']);
+      var route = this.rt.status.routes.getRoute(req);
+      return _objectSpread(_objectSpread({
+        reqid: uniqueID(),
+        timestamp: new Date().getTime(),
+        graphql: this.graphql(req),
+        url: req.originalUrl,
+        route: route,
+        userip: req.ip,
+        statuscode: res.statusCode
+      }, extras), {}, {
+        agent: {
+          browser: ua.getBrowser(),
+          engine: ua.getEngine(),
+          os: ua.getOS(),
+          device: ua.getDevice(),
+          cpu: ua.getCPU()
+        }
+      });
+    }
+  }, {
+    key: "graphql",
+    value: function graphql(req) {
+      return req.originalUrl.startsWith('/graphql');
+    }
+  }, {
+    key: "pushReject",
+    value: function pushReject(req, res) {
+      var commons = this.commons(req, res);
+      this.data.push(_objectSpread(_objectSpread({}, commons), {}, {
+        status: 'REJECTED',
+        delay: 0,
+        took: 0
+      }));
+    }
+  }, {
+    key: "push",
+    value: function push(req, res, queuems, startms, closems) {
+      var commons = this.commons(req, res);
+      var delay = startms - queuems;
+      var took = closems - startms;
+      this.data.push(_objectSpread(_objectSpread({}, commons), {}, {
+        status: 'ACCEPTED',
+        delay: delay,
+        took: took
+      }));
+    }
+  }]);
+  return TStatusLogs;
+}();
+var TStatusQueue = /*#__PURE__*/function () {
+  function TStatusQueue(rt) {
+    _classCallCheck(this, TStatusQueue);
+    _defineProperty(this, "rt", void 0);
+    this.rt = rt;
+  }
+  _createClass(TStatusQueue, [{
+    key: "getStatus",
+    value: function getStatus() {
+      var waitings = this.rt.traffics.filter(function (t) {
+        return !t.started;
+      });
+      return {
+        running: this.rt.traffics.length - waitings.length,
+        waiting: waitings.length,
+        waitTime: waitings.length ? new Date().getTime() - waitings[0].queuems : 0
+      };
+    }
+  }]);
+  return TStatusQueue;
+}();
+var Route = /*#__PURE__*/function () {
+  function Route(route) {
+    _classCallCheck(this, Route);
     _defineProperty(this, "route", void 0);
     _defineProperty(this, "count", 0);
     _defineProperty(this, "cputime", 0);
     _defineProperty(this, "maxtime", 0);
-    _defineProperty(this, "mintime", Infinity);
-    _defineProperty(this, "statusCodes", {});
+    _defineProperty(this, "statuscodes", {});
     this.route = route;
   }
-  _createClass(Status, [{
-    key: "saveStatus",
-    value: function saveStatus(time, statusCode) {
+  _createClass(Route, [{
+    key: "push",
+    value: function push(took, statuscode) {
       this.count += 1;
-      this.cputime += time;
-      this.mintime = Math.min(this.mintime, time);
-      this.maxtime = Math.max(this.maxtime, time);
-      if (!this.statusCodes[statusCode]) this.statusCodes[statusCode] = 0;
-      this.statusCodes[statusCode] += 1;
+      this.cputime += took;
+      this.maxtime = Math.max(this.maxtime, took);
+      if (!this.statuscodes[statuscode]) this.statuscodes[statuscode] = 0;
+      this.statuscodes[statuscode] += 1;
     }
   }, {
     key: "average",
@@ -44,806 +316,237 @@ var Status = /*#__PURE__*/function () {
       return Math.round(this.cputime / this.count);
     }
   }, {
-    key: "summery",
-    get: function get() {
+    key: "getStatus",
+    value: function getStatus() {
       return {
         count: this.count,
-        mintime: this.mintime + 'ms',
-        average: this.average + 'ms',
-        maxtime: this.maxtime + 'ms',
-        cputime: ms(this.cputime, {
-          verbose: true,
-          secondsDecimalDigits: 0
-        }),
-        statusCodes: this.statusCodes
+        average: this.average,
+        maxtime: this.maxtime,
+        cputime: this.cputime,
+        statuscodes: this.statuscodes
       };
     }
   }]);
-  return Status;
+  return Route;
 }();
-var RouteStatus = /*#__PURE__*/function () {
-  function RouteStatus() {
-    _classCallCheck(this, RouteStatus);
-    _defineProperty(this, "routes", {});
+var Unknowns = /*#__PURE__*/function () {
+  function Unknowns() {
+    _classCallCheck(this, Unknowns);
+    _defineProperty(this, "maxurls", 100);
+    _defineProperty(this, "urls", {});
+    _defineProperty(this, "unlisted", 0);
   }
-  _createClass(RouteStatus, [{
-    key: "saveStatus",
-    value: function saveStatus(routename, time, statusCode) {
-      var route = this.routes[routename];
-      if (!route) this.routes[routename] = new Status(routename);
-      this.routes[routename].saveStatus(time, statusCode);
+  _createClass(Unknowns, [{
+    key: "push",
+    value: function push(url) {
+      if (Object.keys(this.urls).length > this.maxurls) return ++this.unlisted;
+      if (!this.urls[url]) this.urls[url] = 0;
+      ++this.urls[url];
     }
   }, {
-    key: "createSummery",
-    value: function createSummery() {
-      var rs = Object.entries(this.routes).map(function (_ref) {
-        var _ref2 = _slicedToArray(_ref, 2),
-          _ = _ref2[0],
-          route = _ref2[1];
+    key: "getStatus",
+    value: function getStatus() {
+      var status = _objectSpread({}, this.urls);
+      if (this.unlisted) status.unlisted = this.unlisted;
+      return status;
+    }
+  }]);
+  return Unknowns;
+}();
+var TStatusRoutes = /*#__PURE__*/function () {
+  function TStatusRoutes() {
+    _classCallCheck(this, TStatusRoutes);
+    _defineProperty(this, "routes", {});
+    _defineProperty(this, "unknowns", new Unknowns());
+  }
+  _createClass(TStatusRoutes, [{
+    key: "push",
+    value: function push(req, res, startms, closems) {
+      var routename = this.getRoute(req);
+      if (!routename) return this.unknowns.push(req.originalUrl);
+      var route = this.routes[routename];
+      if (!route) this.routes[routename] = new Route(routename);
+      this.routes[routename].push(closems - startms, res.statusCode);
+    }
+  }, {
+    key: "getRoute",
+    value: function getRoute(req) {
+      var _req$body, _req$route;
+      var graphql = req.baseUrl.startsWith('/graphql');
+      return (graphql ? (_req$body = req.body) === null || _req$body === void 0 ? void 0 : _req$body.operationName : (_req$route = req.route) === null || _req$route === void 0 ? void 0 : _req$route.path) || null;
+    }
+  }, {
+    key: "getStatus",
+    value: function getStatus() {
+      var rs = Object.entries(this.routes).map(function (_ref2) {
+        var _ref3 = _slicedToArray(_ref2, 2),
+          _ = _ref3[0],
+          route = _ref3[1];
         return route;
-      });
-      rs.sort(function (a, b) {
-        return b.count - a.count;
       });
       var counts = rs.reduce(function (a, b) {
         return a + b.count;
       }, 0);
-      var cputimes = rs.reduce(function (a, b) {
+      var cputime = rs.reduce(function (a, b) {
         return a + b.cputime;
       }, 0);
-      var cputime = ms(cputimes, {
-        verbose: true,
-        secondsDecimalDigits: 0
-      });
-      var average = Math.round(cputimes / counts) + 'ms';
+      var average = cputime / counts;
+      var unknowns = this.unknowns.getStatus();
       var routes = {};
       rs.forEach(function (route) {
-        return routes[route.route] = route.summery;
+        return routes[route.route] = route.getStatus();
       });
       return {
         counts: counts,
         average: average,
         cputime: cputime,
-        routes: routes
+        routes: routes,
+        unknowns: unknowns
       };
     }
   }]);
-  return RouteStatus;
+  return TStatusRoutes;
 }();
-var routeStatus = new RouteStatus();
-var routeStatusMiddleware = function routeStatusMiddleware() {
+var TStausTraffics = /*#__PURE__*/function () {
+  function TStausTraffics() {
+    _classCallCheck(this, TStausTraffics);
+    _defineProperty(this, "acceptCount", 0);
+    _defineProperty(this, "rejectCount", 0);
+  }
+  _createClass(TStausTraffics, [{
+    key: "accept",
+    value: function accept() {
+      this.acceptCount += 1;
+    }
+  }, {
+    key: "reject",
+    value: function reject() {
+      this.rejectCount += 1;
+    }
+  }, {
+    key: "getStatus",
+    value: function getStatus() {
+      return {
+        served: this.acceptCount,
+        lost: this.rejectCount,
+        percentage: this.rejectCount / (this.acceptCount + this.rejectCount) * 100
+      };
+    }
+  }]);
+  return TStausTraffics;
+}();
+var TrafficStatus = /*#__PURE__*/function () {
+  function TrafficStatus(rt) {
+    _classCallCheck(this, TrafficStatus);
+    _defineProperty(this, "logs", void 0);
+    _defineProperty(this, "delay", new TStatusDelay());
+    _defineProperty(this, "traffic", new TStausTraffics());
+    _defineProperty(this, "queue", void 0);
+    _defineProperty(this, "commons", new TStatusCommons());
+    _defineProperty(this, "routes", new TStatusRoutes());
+    this.queue = new TStatusQueue(rt);
+    this.logs = new TStatusLogs(rt);
+  }
+  _createClass(TrafficStatus, [{
+    key: "onReject",
+    value: function onReject(req, res) {
+      this.traffic.reject();
+      this.logs.pushReject(req, res);
+    }
+  }, {
+    key: "onQueue",
+    value: function onQueue() {
+      this.traffic.accept();
+    }
+  }, {
+    key: "onStart",
+    value: function onStart(queuems, startms) {
+      this.delay.push(queuems, startms);
+    }
+  }, {
+    key: "onClose",
+    value: function onClose(req, res, queuems, startms, closems) {
+      this.routes.push(req, res, startms, closems);
+      this.logs.push(req, res, queuems, startms, closems);
+    }
+  }, {
+    key: "getStatus",
+    value: function getStatus() {
+      return _objectSpread(_objectSpread({}, this.commons.getStatus()), {}, {
+        queue: this.queue.getStatus(),
+        traffics: this.traffic.getStatus(),
+        delay: this.delay.getStatus(),
+        routes: this.routes.getStatus()
+      });
+    }
+  }]);
+  return TrafficStatus;
+}();
+var RouteTraffics = /*#__PURE__*/function (_TrafficOpts) {
+  _inherits(RouteTraffics, _TrafficOpts);
+  var _super = _createSuper(RouteTraffics);
+  function RouteTraffics() {
+    var _this4;
+    _classCallCheck(this, RouteTraffics);
+    for (var _len = arguments.length, args = new Array(_len), _key = 0; _key < _len; _key++) {
+      args[_key] = arguments[_key];
+    }
+    _this4 = _super.call.apply(_super, [this].concat(args));
+    _defineProperty(_assertThisInitialized(_this4), "traffics", []);
+    _defineProperty(_assertThisInitialized(_this4), "status", void 0);
+    return _this4;
+  }
+  _createClass(RouteTraffics, [{
+    key: "begin",
+    value: function begin(opts) {
+      this.opts = opts;
+      this.status = new TrafficStatus(this);
+    }
+  }, {
+    key: "checkAccept",
+    value: function checkAccept(props) {
+      if (this.traffics.length < this.maxQueue) return;
+      this.status.onReject(props.req, props.res);
+      throw new common.NotAcceptableException();
+    }
+  }, {
+    key: "pushTraffic",
+    value: function pushTraffic(props) {
+      if (this.excludes.includes(props.req.path)) return props.next();
+      this.checkAccept(props);
+      this.traffics.push(new Traffic(this, props));
+      this.check();
+    }
+  }, {
+    key: "check",
+    value: function check() {
+      this.traffics = this.traffics.filter(function (t) {
+        return !t.closed;
+      });
+      var busycount = this.traffics.filter(function (t) {
+        return t.started && !t.unlocked;
+      }).length;
+      var allowed = Math.max(this.concurrency - busycount, 0);
+      if (!allowed) return;
+      this.traffics.filter(function (t) {
+        return !t.started;
+      }).splice(0, allowed).forEach(function (t) {
+        return t.start();
+      });
+    }
+  }]);
+  return RouteTraffics;
+}(TrafficOpts);
+var $routeTraffic = new RouteTraffics();
+var routeTrafficMiddleware = function routeTrafficMiddleware() {
   var opts = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-  var _opts$excludes = opts.excludes,
-    excludes = _opts$excludes === void 0 ? [] : _opts$excludes;
+  $routeTraffic.begin(opts);
   return function (req, res, next) {
-    var stime = new Date().getTime();
-    onHeaders(res, function () {
-      var etime = new Date().getTime();
-      var time = etime - stime;
-      var routename = getRouteName(req);
-      var statusCode = res.statusCode;
-      if (!excludes.includes(routename)) routeStatus.saveStatus(routename, time, statusCode);
-    });
-    next();
-  };
-};
-var getRouteName = function getRouteName(req) {
-  var _req$body, _req$route;
-  var graphql = req.baseUrl.startsWith('/graphql');
-  var routename = graphql ? (_req$body = req.body) === null || _req$body === void 0 ? void 0 : _req$body.operationName : (_req$route = req.route) === null || _req$route === void 0 ? void 0 : _req$route.path;
-  return routename || 'unknown';
-};
-var Route = function Route(routebase, cdnopts) {
-  return function (target) {
-    var routecdnopts = {
-      bunnycdn: (cdnopts === null || cdnopts === void 0 ? void 0 : cdnopts.bunnycdn) || (cdnopts === null || cdnopts === void 0 ? void 0 : cdnopts.bunnyperma) || !!(cdnopts !== null && cdnopts !== void 0 && cdnopts.bunnysecure) || false,
-      bunnyperma: (cdnopts === null || cdnopts === void 0 ? void 0 : cdnopts.bunnyperma) || false,
-      bunnysecure: (cdnopts === null || cdnopts === void 0 ? void 0 : cdnopts.bunnysecure) || false
-    };
-    target.prototype.$routebase = routebase;
-    target.prototype.$routecdnopts = routecdnopts;
-  };
-};
-var getAllProperties = function getAllProperties(cls) {
-  var properties = [];
-  if (cls.prototype) properties.push.apply(properties, _toConsumableArray(Object.getOwnPropertyNames(cls.prototype)));
-  var extend = Object.getPrototypeOf(cls);
-  if (extend) properties.push.apply(properties, _toConsumableArray(getAllProperties(extend)));
-  return properties;
-};
-var btypes = ['string', 'number', 'boolean', 'object', 'string[]', 'number[]', 'boolean[]', 'object[]', 'any[]']; // prettier-ignore
-var RouteBody = function RouteBody(opts, v) {
-  return function (target, name) {
-    var optional = (opts === null || opts === void 0 ? void 0 : opts.optional) || false;
-    var typename = '';
-    var object = [];
-    var explicit = opts === null || opts === void 0 ? void 0 : opts.type;
-    if (!explicit) typename = Reflect.getMetadata('design:type', target, name).name;else {
-      var arr = tnValidate.isArray(explicit);
-      var expname = (arr ? explicit[0].name : explicit.name).toLowerCase();
-      if (expname === 'array') typename = 'any[]';else if (btypes.includes(expname)) typename = arr ? "".concat(expname, "[]") : expname;else {
-        var expcls = arr ? explicit[0] : explicit;
-        typename = arr ? 'object[]' : 'object';
-        getAllProperties(expcls).forEach(function (p) {
-          var value = expcls.prototype[p];
-          if (value.$body) object.push(value);
-        });
-      }
-    }
-    var type = typename.toLowerCase();
-    if (!btypes.includes(type)) throw new Error("@RouteBody(".concat(name, ") must be typeof ").concat(btypes, "\n"));
-    var validator = v || function () {
-      return true;
-    };
-    var getter = (opts === null || opts === void 0 ? void 0 : opts.getter) || function (v) {
-      return v;
-    };
-    var get = function get() {
-      return {
-        $body: true,
-        name: name,
-        type: type,
-        optional: optional,
-        object: object,
-        selects: (opts === null || opts === void 0 ? void 0 : opts.selects) || null,
-        routesecure: (opts === null || opts === void 0 ? void 0 : opts.routesecure) || false,
-        getter: getter,
-        validator: validator
-      };
-    };
-    Object.defineProperty(target, name, {
-      get: get
+    $routeTraffic.pushTraffic({
+      req: req,
+      res: res,
+      next: next
     });
   };
 };
-var RouteFile = function RouteFile(opts) {
-  return function (target, name) {
-    var _opts$maxsize;
-    var optional = (opts === null || opts === void 0 ? void 0 : opts.optional) || false;
-    var typename = Reflect.getMetadata('design:type', target, name).name;
-    var type = typename === 'Array' ? 'file[]' : 'file';
-    var limit = type === 'file' ? 1 : (opts === null || opts === void 0 ? void 0 : opts.limit) || 20;
-    var msstr = (opts === null || opts === void 0 ? void 0 : (_opts$maxsize = opts.maxsize) === null || _opts$maxsize === void 0 ? void 0 : _opts$maxsize.toString()) || '50M';
-    var mscount = parseFloat(msstr);
-    var maxsize = msstr.endsWith('G') ? mscount * 1000000000 : msstr.endsWith('M') ? mscount * 1000000 : msstr.endsWith('K') ? mscount * 1000 : mscount;
-    var mimetype = (opts === null || opts === void 0 ? void 0 : opts.mimetype) || null;
-    var mimetypes = !mimetype ? null : tnValidate.isArray(mimetype) ? mimetype : [mimetype];
-    var validators = {
-      maxsize: maxsize,
-      limit: limit,
-      mimetypes: mimetypes
-    };
-    var getter = function getter() {
-      return {
-        $file: true,
-        name: name,
-        type: type,
-        optional: optional,
-        validators: validators,
-        selects: null
-      };
-    };
-    Object.defineProperty(target, name, {
-      get: getter
-    });
-  };
-};
-var ptypes = ['string', 'number', 'boolean'];
-var RouteParam = function RouteParam(opts, v) {
-  return function (target, name) {
-    var _opts$type;
-    var optional = (opts === null || opts === void 0 ? void 0 : opts.optional) || false;
-    var typename = (opts === null || opts === void 0 ? void 0 : (_opts$type = opts.type) === null || _opts$type === void 0 ? void 0 : _opts$type.name) || Reflect.getMetadata('design:type', target, name).name;
-    var type = typename.toLowerCase();
-    if (!ptypes.includes(type)) throw new Error("@RouteParam(".concat(name, ") must be typeof ").concat(ptypes, "\n"));
-    var validator = v || function () {
-      return true;
-    };
-    var getter = (opts === null || opts === void 0 ? void 0 : opts.getter) || function (v) {
-      return v;
-    };
-    var get = function get() {
-      return {
-        $param: true,
-        name: name,
-        type: type,
-        optional: optional,
-        selects: (opts === null || opts === void 0 ? void 0 : opts.selects) || null,
-        bunnysecure: (opts === null || opts === void 0 ? void 0 : opts.bunnysecure) || false,
-        validator: validator,
-        getter: getter
-      };
-    };
-    Object.defineProperty(target, name, {
-      get: get
-    });
-  };
-};
-var RouteIndexParam = function RouteIndexParam(index, opts, v) {
-  return function (target, name) {
-    var _opts$type2;
-    var optional = (opts === null || opts === void 0 ? void 0 : opts.optional) || false;
-    var typename = (opts === null || opts === void 0 ? void 0 : (_opts$type2 = opts.type) === null || _opts$type2 === void 0 ? void 0 : _opts$type2.name) || Reflect.getMetadata('design:type', target, name).name;
-    var type = typename.toLowerCase();
-    if (!ptypes.includes(type)) throw new Error("@RouteIndexParam(".concat(name, ") must be typeof ").concat(ptypes, "\n")); // prettier-ignore
-    var validator = v || function () {
-      return true;
-    };
-    var getter = (opts === null || opts === void 0 ? void 0 : opts.getter) || function (v) {
-      return v;
-    };
-    var get = function get() {
-      return {
-        $param: true,
-        index: index,
-        name: name,
-        type: type,
-        optional: optional,
-        selects: (opts === null || opts === void 0 ? void 0 : opts.selects) || null,
-        bunnysecure: (opts === null || opts === void 0 ? void 0 : opts.bunnysecure) || false,
-        validator: validator,
-        getter: getter
-      };
-    };
-    Object.defineProperty(target, name, {
-      get: get
-    });
-  };
-};
-var qtypes = ['string', 'number', 'boolean'];
-var RouteQuery = function RouteQuery(opts, v) {
-  return function (target, name) {
-    var _opts$type3;
-    var optional = (opts === null || opts === void 0 ? void 0 : opts.optional) || false;
-    var typename = (opts === null || opts === void 0 ? void 0 : (_opts$type3 = opts.type) === null || _opts$type3 === void 0 ? void 0 : _opts$type3.name) || Reflect.getMetadata('design:type', target, name).name;
-    var type = typename.toLowerCase();
-    if (!qtypes.includes(type)) throw new Error("@RouteQuery(".concat(name, ") must be typeof ").concat(qtypes, "\n"));
-    var validator = v || function () {
-      return true;
-    };
-    var getter = (opts === null || opts === void 0 ? void 0 : opts.getter) || function (v) {
-      return v;
-    };
-    var get = function get() {
-      return {
-        $query: true,
-        name: name,
-        type: type,
-        optional: optional,
-        selects: (opts === null || opts === void 0 ? void 0 : opts.selects) || null,
-        routesecure: (opts === null || opts === void 0 ? void 0 : opts.routesecure) || false,
-        validator: validator,
-        getter: getter
-      };
-    };
-    Object.defineProperty(target, name, {
-      get: get
-    });
-  };
-};
-var rtypes = ['string', 'number', 'boolean', 'object', 'string[]', 'number[]', 'boolean[]', 'object[]', 'any[]']; // prettier-ignore
-var RouteResult = function RouteResult(opts) {
-  return function (target, name) {
-    var optional = (opts === null || opts === void 0 ? void 0 : opts.optional) || false;
-    var typename = '';
-    var object = [];
-    var explicit = opts === null || opts === void 0 ? void 0 : opts.type;
-    if (!explicit) typename = Reflect.getMetadata('design:type', target, name).name;else {
-      var arr = tnValidate.isArray(explicit);
-      var expname = (arr ? explicit[0].name : explicit.name).toLowerCase();
-      if (expname === 'array') typename = 'any[]';else if (rtypes.includes(expname)) typename = arr ? "".concat(expname, "[]") : expname;else {
-        var expcls = arr ? explicit[0] : explicit;
-        typename = arr ? 'object[]' : 'object';
-        getAllProperties(expcls).forEach(function (p) {
-          var value = expcls.prototype[p];
-          if (value.$result) object.push(value);
-        });
-      }
-    }
-    var type = typename.toLowerCase();
-    if (!rtypes.includes(type)) throw new Error("@RouteResult(".concat(name, ") must be typeof ").concat(rtypes, "\n"));
-    var get = function get() {
-      return {
-        $result: true,
-        name: name,
-        type: type,
-        optional: optional,
-        object: object,
-        selects: (opts === null || opts === void 0 ? void 0 : opts.selects) || null
-      };
-    };
-    Object.defineProperty(target, name, {
-      get: get
-    });
-  };
-};
-var RouteSecure = function RouteSecure(secret, opts) {
-  return function (target, name) {
-    var get = function get() {
-      return {
-        $secure: true,
-        name: name,
-        secret: secret,
-        timesafe: (opts === null || opts === void 0 ? void 0 : opts.timesafe) || false,
-        query: (opts === null || opts === void 0 ? void 0 : opts.query) || false
-      };
-    };
-    Object.defineProperty(target, name, {
-      get: get
-    });
-  };
-};
-var routeFieldsEssentials = function routeFieldsEssentials(ctx) {
-  var req = ctx.switchToHttp().getRequest();
-  var _req$params = req.params,
-    params = _req$params === void 0 ? {} : _req$params,
-    _req$body2 = req.body,
-    body = _req$body2 === void 0 ? {} : _req$body2,
-    _req$files = req.files,
-    files = _req$files === void 0 ? {} : _req$files,
-    _req$query = req.query,
-    query = _req$query === void 0 ? {} : _req$query;
-  var reflector = new core.Reflector();
-  var handler = ctx.getHandler();
-  var path = reflector.get('path', handler);
-  var controller = ctx.getClass();
-  var routes = controller.prototype.$routes;
-  if (!tnValidate.isArray(routes)) throw new common.InternalServerErrorException('@Route() setup has faults');
-  var route = routes.find(function (route) {
-    return route.$route && route.route === path;
-  });
-  if (!route) throw new common.InternalServerErrorException('@Route() setup has faults');
-  return {
-    params: params,
-    body: body,
-    query: query,
-    files: files,
-    route: route
-  };
-};
-var bodyerr = function bodyerr(name) {
-  var prefix = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : [];
-  var prestr = prefix.map(function (p) {
-    return "".concat(p, ".");
-  }).join('');
-  return new common.BadRequestException("Invalid body: ".concat(prestr).concat(name));
-};
-var routeFieldsBodies = function routeFieldsBodies(fields, body, route) {
-  var typecorrection = !!route.files.length;
-  route.bodies.forEach(function (bodyinfo) {
-    var name = bodyinfo.name,
-      type = bodyinfo.type;
-    var prevalue = body[name];
-    var voidvalue = prevalue === undefined || prevalue === null;
-    var value = prevalue;
-    if (typecorrection && !voidvalue) {
-      if (type === 'boolean') {
-        if (prevalue === 'true') value = true;else if (prevalue === 'false') value = false;else throw bodyerr(name);
-      } else if (type === 'number') {
-        value = +prevalue;
-        if (isNaN(value)) throw bodyerr(name);
-      }
-    }
-    fields[name] = getValue(bodyinfo, value);
-  });
-};
-var getValue = function getValue(bodyinfo, value) {
-  var prefix = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : [];
-  var name = bodyinfo.name,
-    optional = bodyinfo.optional,
-    type = bodyinfo.type,
-    object = bodyinfo.object,
-    selects = bodyinfo.selects,
-    validator = bodyinfo.validator,
-    getter = bodyinfo.getter;
-  var voidvalue = value === undefined || value === null;
-  if (!optional && voidvalue) throw bodyerr(name, prefix);
-  if (voidvalue) return;
-  if (type === 'string' && !tnValidate.isString(value)) throw bodyerr(name, prefix);
-  if (type === 'number' && !tnValidate.isNumber(value)) throw bodyerr(name, prefix);
-  if (type === 'boolean' && !tnValidate.isBoolean(value)) throw bodyerr(name, prefix);
-  if (type === 'string[]' && !tnValidate.isStrArr(value)) throw bodyerr(name, prefix);
-  if (type === 'number[]' && !tnValidate.isNumArr(value)) throw bodyerr(name, prefix);
-  if (type === 'boolean[]' && !tnValidate.isBoolArr(value)) throw bodyerr(name, prefix);
-  if (type === 'any[]' && !tnValidate.isArray(value)) throw bodyerr(name, prefix);
-  if (type === 'object[]' && !tnValidate.isArray(value)) throw bodyerr(name, prefix);
-  if (type === 'object' && !tnValidate.isObject(value)) throw bodyerr(name, prefix);
-  if (selects && !selects.includes(value)) throw bodyerr(name);
-  if (!validator(value)) throw bodyerr(name, prefix);
-  if (type !== 'object' && type !== 'object[]') return getter(value);
-  var arr = type === 'object[]';
-  var arrvalue = arr ? value : [value];
-  var retvalue = arrvalue.map(function (values) {
-    var value = {};
-    object.forEach(function (nextbodyinfo) {
-      var nextname = nextbodyinfo.name;
-      var nextvalue = values[nextname];
-      value[nextname] = getValue(nextbodyinfo, nextvalue, [].concat(_toConsumableArray(prefix), [name]));
-    });
-    return getter(value);
-  });
-  return getter(arr ? retvalue : retvalue[0]);
-};
-var fileerr = function fileerr(name) {
-  return new common.BadRequestException("Invalid file: ".concat(name));
-};
-var validate = function validate(file, validators) {
-  var maxsize = validators.maxsize,
-    mimetypes = validators.mimetypes;
-  if (file.size > maxsize) return false;
-  if (!mimetypes) return true;
-  return mimetypes.includes(file.mimetype);
-};
-var routeFieldsFiles = function routeFieldsFiles(fields, files, route) {
-  route.files.forEach(function (_ref3) {
-    var name = _ref3.name,
-      optional = _ref3.optional,
-      type = _ref3.type,
-      validators = _ref3.validators;
-    var multers = files[name];
-    if (!optional && !multers) throw fileerr(name);
-    if (!multers) return;
-    if (type === 'file') {
-      if (multers.length > 1) throw fileerr(name);
-      var file = multers[0];
-      if (!validate(file, validators)) throw fileerr(name);
-      return fields[name] = file;
-    }
-    if (multers.length > validators.limit) throw fileerr(name);
-    if (!multers.map(function (f) {
-      return validate(f, validators);
-    }).every(function (i) {
-      return i;
-    })) throw fileerr(name);
-    fields[name] = multers;
-  });
-};
-var paramerr = function paramerr(name) {
-  return new common.BadRequestException("Invalid parameter: ".concat(name));
-};
-var routeFieldsParams = function routeFieldsParams(fields, params, route) {
-  route.params.forEach(function (_ref4) {
-    var name = _ref4.name,
-      type = _ref4.type,
-      optional = _ref4.optional,
-      selects = _ref4.selects,
-      validator = _ref4.validator,
-      getter = _ref4.getter;
-    var value;
-    var strval = params[name];
-    if (optional && strval === '-') return;else if (type === 'string') value = strval;else if (type === 'boolean') {
-      if (strval === 'true') value = true;else if (strval === 'false') value = false;else throw paramerr(name);
-    } else {
-      value = +strval;
-      if (isNaN(value)) throw paramerr(name);
-    }
-    if (selects && !selects.includes(value)) throw paramerr(name);
-    if (!validator(value)) throw paramerr(name);
-    fields[name] = getter(value);
-  });
-};
-var queryerr = function queryerr(name) {
-  return new common.BadRequestException("Invalid query: ".concat(name));
-};
-var routeFieldsQueries = function routeFieldsQueries(fields, query, route) {
-  route.queries.forEach(function (_ref5) {
-    var name = _ref5.name,
-      type = _ref5.type,
-      optional = _ref5.optional,
-      selects = _ref5.selects,
-      validator = _ref5.validator,
-      getter = _ref5.getter;
-    var value;
-    var strval = query[name];
-    if (optional && (strval === '-' || strval === null || strval === undefined)) return;else if (type === 'string') value = strval;else if (type === 'boolean') {
-      if (strval === 'true') value = true;else if (strval === 'false') value = false;else throw queryerr(name);
-    } else {
-      value = +strval;
-      if (isNaN(value)) throw queryerr(name);
-    }
-    if (selects && !selects.includes(value)) throw queryerr(name);
-    if (!validator(value)) throw queryerr(name);
-    fields[name] = getter(value);
-  });
-};
-var RouteFields = common.createParamDecorator(function (_, ctx) {
-  var _routeFieldsEssential = routeFieldsEssentials(ctx),
-    params = _routeFieldsEssential.params,
-    body = _routeFieldsEssential.body,
-    query = _routeFieldsEssential.query,
-    files = _routeFieldsEssential.files,
-    route = _routeFieldsEssential.route;
-  var fields = {};
-  routeFieldsParams(fields, params, route);
-  routeFieldsQueries(fields, query, route);
-  routeFieldsBodies(fields, body, route);
-  routeFieldsFiles(fields, files, route);
-  return fields;
-});
-var routeInfoCdnConfig = function routeInfoCdnConfig(routecls, params) {
-  var cdnopts = routecls.prototype.$routecdnopts;
-  var routebase = routecls.prototype.$routebase;
-  if (cdnopts.bunnysecure) routebase = '/-secure-/' + routebase;
-  if (cdnopts.bunnyperma) routebase = '/-perma-/' + routebase;
-  var secureroute;
-  if (cdnopts.bunnysecure) {
-    var lock = false;
-    var tokenparams = [];
-    params.forEach(function (param) {
-      if (!param.bunnysecure) return lock = true;
-      if (lock) throw new Error('@RouteParam() bunnysecure:true must be in proper sequence\n');
-      if (param.optional) throw new Error('@RouteParam() bunnysecure:true can not be optional\n');
-      tokenparams.push(param);
-    });
-    var routearr = [routebase].concat(_toConsumableArray(tokenparams.map(function (_ref6) {
-      var name = _ref6.name;
-      return ":".concat(name);
-    }))).join('/');
-    var tokenroute = "/".concat(routearr, "/").replace(/[\\\/]+/g, '/');
-    secureroute = {
-      tokenroute: tokenroute,
-      params: tokenparams
-    };
-  }
-  var cdnconfig = _objectSpread(_objectSpread({}, cdnopts), {}, {
-    secureroute: secureroute
-  });
-  return {
-    routebase: routebase,
-    cdnconfig: cdnconfig
-  };
-};
-var routeInfoFields = function routeInfoFields(routecls) {
-  var paramsUnindexed = [];
-  var paramsIndexed = [];
-  var files = [];
-  var queries = [];
-  var bodies = [];
-  var rsi;
-  getAllProperties(routecls).forEach(function (p) {
-    var body = routecls.prototype[p];
-    if (body.$body) return bodies.push(body);
-    var secure = body;
-    if (secure.$secure) return rsi = secure;
-    var query = body;
-    if (query.$query) return queries.push(query);
-    var file = body;
-    if (file.$file) return files.push(file);
-    var param = body;
-    if (!param.$param) return;
-    if (param.index) paramsIndexed.splice(param.index, 0, param);else paramsUnindexed.push(param);
-  });
-  var params = [].concat(paramsUnindexed, paramsIndexed);
-  return {
-    params: params,
-    files: files,
-    queries: queries,
-    bodies: bodies,
-    rsi: rsi
-  };
-};
-var routeInfoResults = function routeInfoResults(resultcls) {
-  var results = 'String';
-  if ((resultcls === null || resultcls === void 0 ? void 0 : resultcls.name) === 'String') results = 'String';else if ((resultcls === null || resultcls === void 0 ? void 0 : resultcls.name) === 'Buffer') results = 'Buffer';else if (resultcls) {
-    var resjson = [];
-    getAllProperties(resultcls).forEach(function (p) {
-      var result = resultcls.prototype[p];
-      if (result.$result) return resjson.push(result);
-    });
-    results = resjson;
-  }
-  return results;
-};
-var routeInfoRoute = function routeInfoRoute(_ref7) {
-  var routebase = _ref7.routebase,
-    params = _ref7.params,
-    rsi = _ref7.rsi;
-  var routearr = [routebase].concat(_toConsumableArray(params.map(function (_ref8) {
-    var name = _ref8.name;
-    return ":".concat(name);
-  })));
-  if (rsi && !rsi.query) routearr.push(":".concat(rsi.name));
-  return routearr.join('/').replace(/[\\\/]+/g, '/');
-};
-var routeInfoRouteSecure = function routeInfoRouteSecure(rsi) {
-  if (!rsi) return false;
-  return {
-    name: rsi.name,
-    timesafe: rsi.timesafe,
-    query: rsi.query
-  };
-};
-var createRouteInfo = function createRouteInfo(method, routecls, resultcls) {
-  var _routeInfoFields = routeInfoFields(routecls),
-    params = _routeInfoFields.params,
-    queries = _routeInfoFields.queries,
-    bodies = _routeInfoFields.bodies,
-    files = _routeInfoFields.files,
-    rsi = _routeInfoFields.rsi;
-  var _routeInfoCdnConfig = routeInfoCdnConfig(routecls, params),
-    routebase = _routeInfoCdnConfig.routebase,
-    cdnconfig = _routeInfoCdnConfig.cdnconfig;
-  var results = routeInfoResults(resultcls);
-  var route = routeInfoRoute({
-    routebase: routebase,
-    params: params,
-    rsi: rsi
-  });
-  var routesecure = routeInfoRouteSecure(rsi);
-  var name = routecls.name;
-  return {
-    $route: true,
-    route: route,
-    method: method,
-    name: name,
-    routesecure: routesecure,
-    cdnconfig: cdnconfig,
-    queries: queries,
-    params: params,
-    bodies: bodies,
-    files: files,
-    results: results,
-    getRouteSecureSecret: function getRouteSecureSecret() {
-      return rsi === null || rsi === void 0 ? void 0 : rsi.secret;
-    }
-  };
-};
-
-/******************************************************************************
-Copyright (c) Microsoft Corporation.
-
-Permission to use, copy, modify, and/or distribute this software for any
-purpose with or without fee is hereby granted.
-
-THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
-REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
-AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
-INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
-LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
-OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
-PERFORMANCE OF THIS SOFTWARE.
-***************************************************************************** */
-/* global Reflect, Promise */
-
-function __decorate(decorators, target, key, desc) {
-  var c = arguments.length,
-    r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc,
-    d;
-  if ((typeof Reflect === "undefined" ? "undefined" : _typeof(Reflect)) === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
-  return c > 3 && r && Object.defineProperty(target, key, r), r;
-}
-function __metadata(metadataKey, metadataValue) {
-  if ((typeof Reflect === "undefined" ? "undefined" : _typeof(Reflect)) === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(metadataKey, metadataValue);
-}
-var routekey = 'routesecure';
-var RouteSecureGuard = function RouteSecureGuard(route) {
-  return common.applyDecorators(common.SetMetadata(routekey, route), common.UseGuards(Activate));
-};
-var Activate = /*#__PURE__*/function () {
-  function Activate(reflector) {
-    _classCallCheck(this, Activate);
-    _defineProperty(this, "reflector", void 0);
-    this.reflector = reflector;
-  }
-  _createClass(Activate, [{
-    key: "canActivate",
-    value: function canActivate(context) {
-      var handles = [context.getHandler(), context.getClass()];
-      var route = this.reflector.getAllAndOverride(routekey, handles);
-      var req = context.switchToHttp().getRequest();
-      var _req$params2 = req.params,
-        params = _req$params2 === void 0 ? {} : _req$params2,
-        _req$query2 = req.query,
-        query = _req$query2 === void 0 ? {} : _req$query2,
-        _req$body3 = req.body,
-        body = _req$body3 === void 0 ? {} : _req$body3;
-      var rs = route.routesecure;
-      if (!rs) return true;
-      var token = rs.query ? query[rs.name] : params[rs.name];
-      if (!token) throw new common.UnauthorizedException();
-      var secret = route.getRouteSecureSecret();
-      var checks = [];
-      route.params.forEach(function (_ref9) {
-        var name = _ref9.name;
-        return checks.push(params[name]);
-      });
-      route.queries.forEach(function (_ref10) {
-        var name = _ref10.name,
-          routesecure = _ref10.routesecure;
-        if (!routesecure) return;
-        var val = query[name];
-        var isnull = val === null || val === undefined;
-        if (!isnull) checks.push(val);
-      });
-      route.bodies.forEach(function (_ref11) {
-        var name = _ref11.name,
-          routesecure = _ref11.routesecure;
-        if (!routesecure) return;
-        var val = body[name];
-        var isnull = val === null || val === undefined;
-        if (!isnull) checks.push(JSON.stringify(val));
-      });
-      var checkstr = checks.join('/');
-      if (rs.timesafe) {
-        var _token$split = token.split('.'),
-          _token$split2 = _slicedToArray(_token$split, 2),
-          expstr = _token$split2[0],
-          hash = _token$split2[1];
-        var remain = +expstr - new Date().getTime();
-        if (remain <= 0 || remain >= ms$1(rs.timesafe)) throw new common.UnauthorizedException();
-        var hashmatch = sha(checkstr + expstr + secret).toString();
-        if (hash !== hashmatch) throw new common.UnauthorizedException();
-      } else {
-        var _hashmatch = sha(checkstr + secret).toString();
-        if (token !== _hashmatch) throw new common.UnauthorizedException();
-      }
-      return true;
-    }
-  }]);
-  return Activate;
-}();
-Activate = __decorate([common.Injectable(), __metadata("design:paramtypes", [core.Reflector])], Activate);
-var RouteGet = function RouteGet(routecls, resultcls) {
-  return createDecor('GET', routecls, resultcls);
-}; // prettier-ignore
-var RoutePost = function RoutePost(routecls, resultcls) {
-  return createDecor('POST', routecls, resultcls);
-}; // prettier-ignore
-var createDecor = function createDecor(method, routecls, resultcls) {
-  var routeinfo = createRouteInfo(method, routecls, resultcls);
-  var decors = [];
-  decors.push(function (target) {
-    if (!tnValidate.isArray(target.$routes)) target.$routes = [];
-    target.$routes.push(routeinfo);
-  });
-  var Method = method === 'GET' ? common.Get : common.Post;
-  decors.push(Method(routeinfo.route));
-  if (routeinfo.files.length) {
-    var multer = routeinfo.files.map(function (file) {
-      return {
-        name: file.name
-      };
-    });
-    decors.push(common.UseInterceptors(platformExpress.FileFieldsInterceptor(multer)));
-    var acc = ['string', 'number', 'boolean'];
-    routeinfo.bodies.forEach(function (_ref12) {
-      var type = _ref12.type,
-        name = _ref12.name;
-      if (acc.includes(type)) return;
-      throw new Error("You are using @RouteFile() so @RouteBody(".concat(name, ") must be typeof ").concat(acc, "\n"));
-    });
-  }
-  if (routeinfo.routesecure) decors.push(RouteSecureGuard(routeinfo));
-  if (routeinfo.cdnconfig.bunnysecure) {
-    var rs = routeinfo.routesecure;
-    if (rs && rs.query) throw new Error("@RouteSecure() query:true not allowed when bunnysecure\n");
-    if (routeinfo.queries.length) throw new Error("@RouteQuery() not allowed when bunnysecure");
-  }
-  return common.applyDecorators.apply(common, decors);
-};
-var routeSchemaCreator = function routeSchemaCreator(controllers) {
-  return controllers.map(function (controller) {
-    var routes = controller.prototype.$routes;
-    if (tnValidate.isArray(routes)) return routes.filter(function (r) {
-      return r.$route;
-    });
-  }).filter(function (i) {
-    return i;
-  }).flat();
-};
-exports.Route = Route;
-exports.RouteBody = RouteBody;
-exports.RouteFields = RouteFields;
-exports.RouteFile = RouteFile;
-exports.RouteGet = RouteGet;
-exports.RouteIndexParam = RouteIndexParam;
-exports.RouteParam = RouteParam;
-exports.RoutePost = RoutePost;
-exports.RouteQuery = RouteQuery;
-exports.RouteResult = RouteResult;
-exports.RouteSecure = RouteSecure;
-exports.RouteStatus = RouteStatus;
-exports.createRouteInfo = createRouteInfo;
-exports.routeSchemaCreator = routeSchemaCreator;
-exports.routeStatus = routeStatus;
-exports.routeStatusMiddleware = routeStatusMiddleware;
+exports.routeTrafficMiddleware = routeTrafficMiddleware;

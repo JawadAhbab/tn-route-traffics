@@ -1,13 +1,4 @@
-export { RouteStatus, routeStatus } from './Middlewares/RouteStatus/RouteStatus';
-export { routeStatusMiddleware } from './Middlewares/RouteStatus/routeStatusMiddleware';
-export { Route } from './Route/Route';
-export { RouteBody } from './Route/RouteField/RouteBody';
-export { RouteFile } from './Route/RouteField/RouteFile';
-export { RouteIndexParam, RouteParam } from './Route/RouteField/RouteParam';
-export { RouteQuery } from './Route/RouteField/RouteQuery';
-export { RouteResult } from './Route/RouteField/RouteResult';
-export { RouteSecure } from './Route/RouteField/RouteSecure';
-export { RouteFields } from './Route/RouteFields/RouteFields';
-export { createRouteInfo } from './Route/RouteInfo/RouteInfo';
-export { RouteGet, RoutePost } from './Route/RouteMethods';
-export { routeSchemaCreator } from './Route/routeSchemaCreator';
+import { Request, Response } from 'express';
+import { Func } from 'tn-typescript';
+import { RouteTrafficsOpts } from './RouteTraffics/TrafficOpts/TrafficOpts';
+export declare const routeTrafficMiddleware: (opts?: RouteTrafficsOpts) => (req: Request, res: Response, next: Func) => void;
