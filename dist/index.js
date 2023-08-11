@@ -5,16 +5,13 @@ var _inherits = require("@babel/runtime/helpers/inherits");
 var _createSuper = require("@babel/runtime/helpers/createSuper");
 var _slicedToArray = require("@babel/runtime/helpers/slicedToArray");
 var _objectSpread = require("@babel/runtime/helpers/objectSpread2");
-var _toConsumableArray = require("@babel/runtime/helpers/toConsumableArray");
 var _classCallCheck = require("@babel/runtime/helpers/classCallCheck");
 var _createClass = require("@babel/runtime/helpers/createClass");
 var _defineProperty = require("@babel/runtime/helpers/defineProperty");
 var common = require('@nestjs/common');
 var ms = require('ms');
 var tnValidate = require('tn-validate');
-var tnCapitalize = require('tn-capitalize');
-var tnCase = require('tn-case');
-var ung = require('unique-names-generator');
+var tnUniqname = require('tn-uniqname');
 var UAParser = require('ua-parser-js');
 var tnUniqid = require('tn-uniqid');
 var getMs = function getMs(time) {
@@ -140,22 +137,6 @@ var TrafficOpts = /*#__PURE__*/function () {
   return TrafficOpts;
 }();
 var stime = new Date().getTime();
-var dic = [];
-var dicadd = function dicadd(a) {
-  return a.map(function (e) {
-    return dic.push.apply(dic, _toConsumableArray(e.split(/[ -]/g).filter(function (i) {
-      return i.length > 2;
-    })));
-  });
-};
-dicadd([ung.countries, ung.animals, ung.adjectives, ung.colors, ung.languages].flat());
-var uniqueName = function uniqueName(podname) {
-  var name = ung.uniqueNamesGenerator({
-    dictionaries: [dic, dic],
-    seed: podname
-  });
-  return tnCapitalize.capitalize(tnCase.spaceCase(name));
-};
 var TStatusCommons = /*#__PURE__*/function () {
   function TStatusCommons() {
     _classCallCheck(this, TStatusCommons);
@@ -165,7 +146,7 @@ var TStatusCommons = /*#__PURE__*/function () {
     value: function getStatus() {
       var podname = process.env.HOSTNAME || 'unknown';
       return {
-        name: uniqueName(podname),
+        name: tnUniqname.uniqname(2, podname),
         podname: podname,
         age: new Date().getTime() - stime
       };
