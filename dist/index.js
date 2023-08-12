@@ -634,7 +634,7 @@ var routeTrafficsBypassHeaders = function routeTrafficsBypassHeaders(secret) {
   var exp = new Date().getTime() + ms('10m');
   var hash = sha(exp + secret).toString();
   return {
-    bypasstraffic: hash
+    bypasstraffic: "".concat(exp, ".").concat(hash)
   };
 };
 exports.$routeTraffics = $routeTraffics;
