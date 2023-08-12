@@ -4,8 +4,11 @@ import { AnyObject } from 'tn-typescript';
 export interface RouteTrafficsOpts {
     concurrency?: number;
     maxQueue?: number;
-    unlockTime?: number | string;
+    unlockTimeout?: number | string;
+    forceCloseTimeout?: number | string;
     excludes?: string[];
+    bypass?: string[];
+    bypassSecret?: string;
     logDump?: (dump: string) => void;
     logDumpInterval?: number | string;
     logDumpExtras?: {
@@ -18,8 +21,11 @@ export declare class TrafficOpts {
     protected opts: RouteTrafficsOpts;
     get concurrency(): number;
     get maxQueue(): number;
-    get unlockTime(): string | number;
+    get unlockTimeout(): string | number;
+    get forceCloseTimeout(): string | number;
     get excludes(): string[];
+    get bypass(): string[];
+    get bypassSecret(): string;
     get logDump(): (dump: string) => void;
     get logDumpInterval(): string | number;
     get logDumpExtras(): {

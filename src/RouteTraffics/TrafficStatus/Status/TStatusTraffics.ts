@@ -54,6 +54,7 @@ class Unknowns {
 export class TStatusTraffics {
   private served = 0
   private lost = 0
+  private bypassed = 0
   private routes: ObjectOf<Route> = {}
   private unknowns = new Unknowns()
 
@@ -68,6 +69,9 @@ export class TStatusTraffics {
   public pushLoss() {
     ++this.lost
   }
+  public pushBypass() {
+    ++this.bypassed
+  }
 
   public getRoute(req: Request): string | null {
     const graphql = req.baseUrl.startsWith('/graphql')
@@ -75,7 +79,7 @@ export class TStatusTraffics {
   }
 
   public getStatus() {
-    const { served, lost } = this
+    const { served, lost, bypassed } = this
     const rs = Object.entries(this.routes).map(([_, route]) => route)
     const counts = rs.reduce((a, b) => a + b.count, 0)
     const cputime = rs.reduce((a, b) => a + b.cputime, 0)
@@ -83,6 +87,6 @@ export class TStatusTraffics {
     const unknowns = this.unknowns.getStatus()
     const routes: AnyObject = {}
     rs.forEach(route => (routes[route.route] = route.getStatus()))
-    return { served, lost, average, cputime, routes, unknowns }
+    return { served, lost, bypassed, average, cputime, routes, unknowns }
   }
 }

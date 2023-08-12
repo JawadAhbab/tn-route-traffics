@@ -20,6 +20,7 @@ export declare class Traffic {
     unlocked: boolean;
     private timeouts;
     start(): void;
+    bypass(): void;
     private unlock;
     private close;
 }

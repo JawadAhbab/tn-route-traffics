@@ -14,6 +14,7 @@ var tnValidate = require('tn-validate');
 var tnUniqname = require('tn-uniqname');
 var UAParser = require('ua-parser-js');
 var tnUniqid = require('tn-uniqid');
+var sha = require('crypto-js/sha256');
 var getMs = function getMs(time) {
   return tnValidate.isNumber(time) ? time : ms(time);
 };
@@ -48,16 +49,30 @@ var Traffic = /*#__PURE__*/function () {
     key: "start",
     value: function start() {
       var _this2 = this;
+      if (this.started) return;
       this.startms = new Date().getTime();
       this.started = true;
       this.next();
       this.rt.status.onStart(this.queuems, this.startms);
       this.timeouts.push(setTimeout(function () {
         return _this2.unlock();
-      }, getMs(this.rt.unlockTime)));
+      }, getMs(this.rt.unlockTimeout)));
       this.timeouts.push(setTimeout(function () {
         return _this2.close();
-      }, ms('10m')));
+      }, getMs(this.rt.forceCloseTimeout)));
+    }
+  }, {
+    key: "bypass",
+    value: function bypass() {
+      var _this3 = this;
+      this.startms = new Date().getTime();
+      this.started = true;
+      this.unlocked = true;
+      this.next();
+      this.rt.status.onStart(this.queuems, this.startms);
+      this.timeouts.push(setTimeout(function () {
+        return _this3.close();
+      }, getMs(this.rt.forceCloseTimeout)));
     }
   }, {
     key: "unlock",
@@ -96,14 +111,29 @@ var TrafficOpts = /*#__PURE__*/function () {
       return this.opts.maxQueue || 10000;
     }
   }, {
-    key: "unlockTime",
+    key: "unlockTimeout",
     get: function get() {
-      return this.opts.unlockTime || 600000;
+      return this.opts.unlockTimeout || '1m';
+    }
+  }, {
+    key: "forceCloseTimeout",
+    get: function get() {
+      return this.opts.forceCloseTimeout || '10m';
     }
   }, {
     key: "excludes",
     get: function get() {
       return this.opts.excludes || [];
+    }
+  }, {
+    key: "bypass",
+    get: function get() {
+      return this.opts.bypass || [];
+    }
+  }, {
+    key: "bypassSecret",
+    get: function get() {
+      return this.opts.bypassSecret || '';
     }
   }, {
     key: "logDump",
@@ -193,17 +223,17 @@ var uniqueID = tnUniqid.uniqueGetter({
 });
 var TStatusLogs = /*#__PURE__*/function () {
   function TStatusLogs(rt) {
-    var _this3 = this;
+    var _this4 = this;
     _classCallCheck(this, TStatusLogs);
     _defineProperty(this, "rt", void 0);
     _defineProperty(this, "visits", []);
     _defineProperty(this, "pressures", []);
     this.rt = rt;
     setInterval(function () {
-      return _this3.pushPressure();
+      return _this4.pushPressure();
     }, ms('1m'));
     setInterval(function () {
-      return _this3.dump();
+      return _this4.dump();
     }, getMs(rt.logDumpInterval));
   }
   _createClass(TStatusLogs, [{
@@ -294,13 +324,13 @@ var TStatusLogs = /*#__PURE__*/function () {
 }();
 var TStatusPressure = /*#__PURE__*/function () {
   function TStatusPressure(rt) {
-    var _this4 = this;
+    var _this5 = this;
     _classCallCheck(this, TStatusPressure);
     _defineProperty(this, "rt", void 0);
     _defineProperty(this, "records", []);
     this.rt = rt;
     setInterval(function () {
-      return _this4.record();
+      return _this5.record();
     }, ms('1s'));
   }
   _createClass(TStatusPressure, [{
@@ -394,6 +424,7 @@ var TStatusTraffics = /*#__PURE__*/function () {
     _classCallCheck(this, TStatusTraffics);
     _defineProperty(this, "served", 0);
     _defineProperty(this, "lost", 0);
+    _defineProperty(this, "bypassed", 0);
     _defineProperty(this, "routes", {});
     _defineProperty(this, "unknowns", new Unknowns());
   }
@@ -413,6 +444,11 @@ var TStatusTraffics = /*#__PURE__*/function () {
       ++this.lost;
     }
   }, {
+    key: "pushBypass",
+    value: function pushBypass() {
+      ++this.bypassed;
+    }
+  }, {
     key: "getRoute",
     value: function getRoute(req) {
       var _req$body, _req$route;
@@ -423,7 +459,8 @@ var TStatusTraffics = /*#__PURE__*/function () {
     key: "getStatus",
     value: function getStatus() {
       var served = this.served,
-        lost = this.lost;
+        lost = this.lost,
+        bypassed = this.bypassed;
       var rs = Object.entries(this.routes).map(function (_ref2) {
         var _ref3 = _slicedToArray(_ref2, 2),
           _ = _ref3[0],
@@ -445,6 +482,7 @@ var TStatusTraffics = /*#__PURE__*/function () {
       return {
         served: served,
         lost: lost,
+        bypassed: bypassed,
         average: average,
         cputime: cputime,
         routes: routes,
@@ -470,6 +508,11 @@ var TrafficStatus = /*#__PURE__*/function () {
     value: function onReject(req, res) {
       this.traffics.pushLoss();
       this.logs.pushRejectVisit(req, res);
+    }
+  }, {
+    key: "onBypass",
+    value: function onBypass() {
+      this.traffics.pushBypass();
     }
   }, {
     key: "onQueue",
@@ -501,21 +544,26 @@ var RouteTraffics = /*#__PURE__*/function (_TrafficOpts) {
   _inherits(RouteTraffics, _TrafficOpts);
   var _super = _createSuper(RouteTraffics);
   function RouteTraffics() {
-    var _this5;
+    var _this6;
     _classCallCheck(this, RouteTraffics);
     for (var _len = arguments.length, args = new Array(_len), _key = 0; _key < _len; _key++) {
       args[_key] = arguments[_key];
     }
-    _this5 = _super.call.apply(_super, [this].concat(args));
-    _defineProperty(_assertThisInitialized(_this5), "traffics", []);
-    _defineProperty(_assertThisInitialized(_this5), "status", void 0);
-    return _this5;
+    _this6 = _super.call.apply(_super, [this].concat(args));
+    _defineProperty(_assertThisInitialized(_this6), "traffics", []);
+    _defineProperty(_assertThisInitialized(_this6), "status", void 0);
+    return _this6;
   }
   _createClass(RouteTraffics, [{
     key: "begin",
     value: function begin(opts) {
       this.opts = opts;
       this.status = new TrafficStatus(this);
+    }
+  }, {
+    key: "checkExcludes",
+    value: function checkExcludes(props) {
+      return this.excludes.includes(props.req.path);
     }
   }, {
     key: "checkAccept",
@@ -525,11 +573,29 @@ var RouteTraffics = /*#__PURE__*/function (_TrafficOpts) {
       throw new common.NotAcceptableException();
     }
   }, {
+    key: "checkBypass",
+    value: function checkBypass(props) {
+      if (this.bypass.includes(props.req.path)) return true;
+      var bypasstraffic = props.req.headers['bypasstraffic'];
+      if (!bypasstraffic) return false;
+      var _bypasstraffic$toStri = bypasstraffic.toString().split('.'),
+        _bypasstraffic$toStri2 = _slicedToArray(_bypasstraffic$toStri, 2),
+        expstr = _bypasstraffic$toStri2[0],
+        hash = _bypasstraffic$toStri2[1];
+      if (+expstr < new Date().getTime()) return false;
+      var bypass = hash === sha(expstr + this.bypassSecret).toString();
+      if (bypass) this.status.onBypass();
+      return bypass;
+    }
+  }, {
     key: "pushTraffic",
     value: function pushTraffic(props) {
-      if (this.excludes.includes(props.req.path)) return props.next();
+      if (this.checkExcludes(props)) return props.next();
       this.checkAccept(props);
-      this.traffics.push(new Traffic(this, props));
+      var bypass = this.checkBypass(props);
+      var traffic = new Traffic(this, props);
+      if (bypass) traffic.bypass();
+      this.traffics.push(traffic);
       this.check();
     }
   }, {
@@ -564,5 +630,13 @@ var routeTrafficsMiddleware = function routeTrafficsMiddleware() {
     });
   };
 };
+var routeTrafficsBypassHeaders = function routeTrafficsBypassHeaders(secret) {
+  var exp = new Date().getTime() + ms('10m');
+  var hash = sha(exp + secret).toString();
+  return {
+    bypasstraffic: hash
+  };
+};
 exports.$routeTraffics = $routeTraffics;
+exports.routeTrafficsBypassHeaders = routeTrafficsBypassHeaders;
 exports.routeTrafficsMiddleware = routeTrafficsMiddleware;

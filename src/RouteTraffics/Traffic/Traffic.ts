@@ -1,5 +1,4 @@
 import { Request, Response } from 'express'
-import ms from 'ms'
 import { Func } from 'tn-typescript'
 import { getMs } from '../../accessories/getMs'
 import { RouteTraffics } from '../RouteTraffics'
@@ -28,12 +27,21 @@ export class Traffic {
   private timeouts: NodeJS.Timeout[] = []
 
   public start() {
+    if (this.started) return
     this.startms = new Date().getTime()
     this.started = true
     this.next()
     this.rt.status.onStart(this.queuems, this.startms)
-    this.timeouts.push(setTimeout(() => this.unlock(), getMs(this.rt.unlockTime)))
-    this.timeouts.push(setTimeout(() => this.close(), ms('10m')))
+    this.timeouts.push(setTimeout(() => this.unlock(), getMs(this.rt.unlockTimeout)))
+    this.timeouts.push(setTimeout(() => this.close(), getMs(this.rt.forceCloseTimeout)))
+  }
+  public bypass() {
+    this.startms = new Date().getTime()
+    this.started = true
+    this.unlocked = true
+    this.next()
+    this.rt.status.onStart(this.queuems, this.startms)
+    this.timeouts.push(setTimeout(() => this.close(), getMs(this.rt.forceCloseTimeout)))
   }
 
   private unlock() {

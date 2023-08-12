@@ -21,6 +21,9 @@ export class TrafficStatus {
     this.traffics.pushLoss()
     this.logs.pushRejectVisit(req, res)
   }
+  public onBypass() {
+    this.traffics.pushBypass()
+  }
   public onQueue() {}
   public onStart(queuems: number, startms: number) {
     this.delay.push(queuems, startms)

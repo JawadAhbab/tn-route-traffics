@@ -10,6 +10,7 @@ export declare class TrafficStatus {
     traffics: TStatusTraffics;
     constructor(rt: RouteTraffics);
     onReject(req: Request, res: Response): void;
+    onBypass(): void;
     onQueue(): void;
     onStart(queuems: number, startms: number): void;
     onClose(req: Request, res: Response, queuems: number, startms: number, closems: number): void;
@@ -24,6 +25,7 @@ export declare class TrafficStatus {
         traffics: {
             served: number;
             lost: number;
+            bypassed: number;
             average: number;
             cputime: number;
             routes: import("tn-typescript").AnyObject;

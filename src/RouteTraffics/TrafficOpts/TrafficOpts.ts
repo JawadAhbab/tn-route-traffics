@@ -3,8 +3,11 @@ import { AnyObject } from 'tn-typescript'
 export interface RouteTrafficsOpts {
   concurrency?: number
   maxQueue?: number
-  unlockTime?: number | string
+  unlockTimeout?: number | string
+  forceCloseTimeout?: number | string
   excludes?: string[]
+  bypass?: string[]
+  bypassSecret?: string
   logDump?: (dump: string) => void
   logDumpInterval?: number | string
   logDumpExtras?: {
@@ -23,11 +26,20 @@ export class TrafficOpts {
   public get maxQueue() {
     return this.opts.maxQueue || 10_000
   }
-  public get unlockTime() {
-    return this.opts.unlockTime || 600_000
+  public get unlockTimeout() {
+    return this.opts.unlockTimeout || '1m'
+  }
+  public get forceCloseTimeout() {
+    return this.opts.forceCloseTimeout || '10m'
   }
   public get excludes() {
     return this.opts.excludes || []
+  }
+  public get bypass() {
+    return this.opts.bypass || []
+  }
+  public get bypassSecret() {
+    return this.opts.bypassSecret || ''
   }
   public get logDump() {
     return this.opts.logDump || (() => null)
