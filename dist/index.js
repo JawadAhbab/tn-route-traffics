@@ -248,7 +248,7 @@ var TStatusLogs = /*#__PURE__*/function () {
     value: function pushPressure() {
       var records = this.rt.status.pressure.getStatus().slice(0, 60);
       if (records.every(function (record) {
-        return !record.queueing;
+        return !record.queueing.total;
       })) return;
       this.pressures.push(_objectSpread(_objectSpread({
         id: uniqueID(),

@@ -28,7 +28,7 @@ export class TStatusLogs {
 
   private pushPressure() {
     const records = this.rt.status.pressure.getStatus().slice(0, 60)
-    if (records.every(record => !record.queueing)) return
+    if (records.every(record => !record.queueing.total)) return
     this.pressures.push({
       id: uniqueID(),
       timestamp: new Date().getTime(),
