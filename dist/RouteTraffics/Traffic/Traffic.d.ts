@@ -6,21 +6,25 @@ export type TrafficProps = {
     res: Response;
     next: Func;
 };
+type Opts = {
+    bypass: boolean;
+};
 export declare class Traffic {
     private rt;
     queuems: number;
     startms: number;
     closems: number;
-    private req;
-    private res;
+    req: Request;
+    res: Response;
+    bypass: boolean;
     private next;
-    constructor(rt: RouteTraffics, { req, res, next }: TrafficProps);
+    constructor(rt: RouteTraffics, tprops: TrafficProps, opts: Opts);
     started: boolean;
     closed: boolean;
     unlocked: boolean;
     private timeouts;
     start(): void;
-    bypass(): void;
     private unlock;
     private close;
 }
+export {};

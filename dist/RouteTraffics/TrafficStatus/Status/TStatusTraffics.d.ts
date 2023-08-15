@@ -1,12 +1,13 @@
-import { Request, Response } from 'express';
+import { Request } from 'express';
 import { AnyObject } from 'tn-typescript';
+import { Traffic } from '../../Traffic/Traffic';
 export declare class TStatusTraffics {
     private served;
     private lost;
     private bypassed;
     private routes;
     private unknowns;
-    pushServed(req: Request, res: Response, startms: number, closems: number): number | undefined;
+    pushServed({ req, res, startms, closems }: Traffic): number | undefined;
     pushLoss(): void;
     pushBypass(): void;
     getRoute(req: Request): string | null;

@@ -13,8 +13,8 @@ export class TStatusPressure {
   private record() {
     const oldest = this.rt.traffics.find(t => !t.started)
     const timestamp = new Date().getTime()
-    const queueing = this.rt.traffics.length
-    const waitTime = oldest ? new Date().getTime() - oldest.queuems : 0
+    const queueing = this.rt.traffics.length + this.rt.bypassTraffics.length
+    const waitTime = oldest ? timestamp - oldest.queuems : 0
     this.records.unshift({ timestamp, queueing, waitTime })
     this.records.splice(300)
   }

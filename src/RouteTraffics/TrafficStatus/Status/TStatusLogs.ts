@@ -65,12 +65,12 @@ export class TStatusLogs {
   }
   public pushRejectVisit(req: Request, res: Response) {
     const commons = this.visitCommons(req, res)
-    this.visits.push({ ...commons, status: 'REJECTED', delay: 0, took: 0 })
+    this.visits.push({ ...commons, status: 'REJECTED', bypass: null, delay: 0, took: 0 })
   }
-  public pushVisit({ req, res, queuems, startms, closems }: Traffic) {
+  public pushVisit({ req, res, queuems, startms, closems, bypass }: Traffic) {
     const commons = this.visitCommons(req, res)
     const delay = startms - queuems
     const took = closems - startms
-    this.visits.push({ ...commons, status: 'ACCEPTED', delay, took })
+    this.visits.push({ ...commons, status: 'ACCEPTED', bypass, delay, took })
   }
 }

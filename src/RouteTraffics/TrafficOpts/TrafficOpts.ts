@@ -4,6 +4,7 @@ export interface RouteTrafficsOpts {
   concurrency?: number
   maxQueue?: number
   unlockTimeout?: number | string
+  bypassUnlockTimeout?: number | string
   forceCloseTimeout?: number | string
   excludes?: string[]
   bypass?: string[]
@@ -28,6 +29,9 @@ export class TrafficOpts {
   }
   public get unlockTimeout() {
     return this.opts.unlockTimeout || '1m'
+  }
+  public get bypassUnlockTimeout() {
+    return this.opts.bypassUnlockTimeout || '5s'
   }
   public get forceCloseTimeout() {
     return this.opts.forceCloseTimeout || '10m'

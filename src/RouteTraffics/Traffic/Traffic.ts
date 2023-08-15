@@ -3,6 +3,7 @@ import { Func } from 'tn-typescript'
 import { getMs } from '../../accessories/getMs'
 import { RouteTraffics } from '../RouteTraffics'
 export type TrafficProps = { req: Request; res: Response; next: Func }
+type Opts = { bypass: boolean }
 
 export class Traffic {
   private rt: RouteTraffics
@@ -11,12 +12,14 @@ export class Traffic {
   public closems!: number
   public req: Request
   public res: Response
+  public bypass: boolean
   private next: Func
-  constructor(rt: RouteTraffics, { req, res, next }: TrafficProps) {
+  constructor(rt: RouteTraffics, tprops: TrafficProps, opts: Opts) {
     this.rt = rt
-    this.req = req
-    this.res = res
-    this.next = next
+    this.bypass = opts.bypass
+    this.req = tprops.req
+    this.res = tprops.res
+    this.next = tprops.next
     this.rt.status.onQueue()
     this.res.once('close', () => this.close())
   }
@@ -32,16 +35,8 @@ export class Traffic {
     this.started = true
     this.next()
     this.rt.status.onStart(this)
-    this.timeouts.push(setTimeout(() => this.unlock(), getMs(this.rt.unlockTimeout)))
-    this.timeouts.push(setTimeout(() => this.close(), getMs(this.rt.forceCloseTimeout)))
-  }
-  public bypass() {
-    if (this.started) return
-    this.startms = new Date().getTime()
-    this.started = true
-    this.unlocked = true
-    this.next()
-    this.rt.status.onStart(this)
+    const unlockTimeout = this.bypass ? this.rt.bypassUnlockTimeout : this.rt.unlockTimeout
+    this.timeouts.push(setTimeout(() => this.unlock(), getMs(unlockTimeout)))
     this.timeouts.push(setTimeout(() => this.close(), getMs(this.rt.forceCloseTimeout)))
   }
 

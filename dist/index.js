@@ -9,21 +9,18 @@ var _classCallCheck = require("@babel/runtime/helpers/classCallCheck");
 var _createClass = require("@babel/runtime/helpers/createClass");
 var _defineProperty = require("@babel/runtime/helpers/defineProperty");
 var common = require('@nestjs/common');
+var sha = require('crypto-js/sha256');
 var ms = require('ms');
 var tnValidate = require('tn-validate');
 var tnUniqname = require('tn-uniqname');
 var UAParser = require('ua-parser-js');
 var tnUniqid = require('tn-uniqid');
-var sha = require('crypto-js/sha256');
 var getMs = function getMs(time) {
   return tnValidate.isNumber(time) ? time : ms(time);
 };
 var Traffic = /*#__PURE__*/function () {
-  function Traffic(rt, _ref) {
+  function Traffic(rt, tprops, opts) {
     var _this = this;
-    var req = _ref.req,
-      res = _ref.res,
-      next = _ref.next;
     _classCallCheck(this, Traffic);
     _defineProperty(this, "rt", void 0);
     _defineProperty(this, "queuems", new Date().getTime());
@@ -31,15 +28,17 @@ var Traffic = /*#__PURE__*/function () {
     _defineProperty(this, "closems", void 0);
     _defineProperty(this, "req", void 0);
     _defineProperty(this, "res", void 0);
+    _defineProperty(this, "bypass", void 0);
     _defineProperty(this, "next", void 0);
     _defineProperty(this, "started", false);
     _defineProperty(this, "closed", false);
     _defineProperty(this, "unlocked", false);
     _defineProperty(this, "timeouts", []);
     this.rt = rt;
-    this.req = req;
-    this.res = res;
-    this.next = next;
+    this.bypass = opts.bypass;
+    this.req = tprops.req;
+    this.res = tprops.res;
+    this.next = tprops.next;
     this.rt.status.onQueue();
     this.res.once('close', function () {
       return _this.close();
@@ -53,25 +52,13 @@ var Traffic = /*#__PURE__*/function () {
       this.startms = new Date().getTime();
       this.started = true;
       this.next();
-      this.rt.status.onStart(this.queuems, this.startms);
+      this.rt.status.onStart(this);
+      var unlockTimeout = this.bypass ? this.rt.bypassUnlockTimeout : this.rt.unlockTimeout;
       this.timeouts.push(setTimeout(function () {
         return _this2.unlock();
-      }, getMs(this.rt.unlockTimeout)));
+      }, getMs(unlockTimeout)));
       this.timeouts.push(setTimeout(function () {
         return _this2.close();
-      }, getMs(this.rt.forceCloseTimeout)));
-    }
-  }, {
-    key: "bypass",
-    value: function bypass() {
-      var _this3 = this;
-      this.startms = new Date().getTime();
-      this.started = true;
-      this.unlocked = true;
-      this.next();
-      this.rt.status.onStart(this.queuems, this.startms);
-      this.timeouts.push(setTimeout(function () {
-        return _this3.close();
       }, getMs(this.rt.forceCloseTimeout)));
     }
   }, {
@@ -86,7 +73,7 @@ var Traffic = /*#__PURE__*/function () {
       if (this.closed) return;
       this.closems = new Date().getTime();
       this.closed = true;
-      this.rt.status.onClose(this.req, this.res, this.queuems, this.startms, this.closems);
+      this.rt.status.onClose(this);
       this.rt.check();
       this.timeouts.forEach(function (timeout) {
         return clearTimeout(timeout);
@@ -114,6 +101,11 @@ var TrafficOpts = /*#__PURE__*/function () {
     key: "unlockTimeout",
     get: function get() {
       return this.opts.unlockTimeout || '1m';
+    }
+  }, {
+    key: "bypassUnlockTimeout",
+    get: function get() {
+      return this.opts.bypassUnlockTimeout || '5s';
     }
   }, {
     key: "forceCloseTimeout",
@@ -194,7 +186,9 @@ var TStatusDelay = /*#__PURE__*/function () {
   }
   _createClass(TStatusDelay, [{
     key: "push",
-    value: function push(queuems, startms) {
+    value: function push(_ref) {
+      var queuems = _ref.queuems,
+        startms = _ref.startms;
       this.startCount += 1;
       var delay = startms - queuems;
       if (delay > 100) {
@@ -223,17 +217,17 @@ var uniqueID = tnUniqid.uniqueGetter({
 });
 var TStatusLogs = /*#__PURE__*/function () {
   function TStatusLogs(rt) {
-    var _this4 = this;
+    var _this3 = this;
     _classCallCheck(this, TStatusLogs);
     _defineProperty(this, "rt", void 0);
     _defineProperty(this, "visits", []);
     _defineProperty(this, "pressures", []);
     this.rt = rt;
     setInterval(function () {
-      return _this4.pushPressure();
+      return _this3.pushPressure();
     }, ms('1m'));
     setInterval(function () {
-      return _this4.dump();
+      return _this3.dump();
     }, getMs(rt.logDumpInterval));
   }
   _createClass(TStatusLogs, [{
@@ -303,18 +297,26 @@ var TStatusLogs = /*#__PURE__*/function () {
       var commons = this.visitCommons(req, res);
       this.visits.push(_objectSpread(_objectSpread({}, commons), {}, {
         status: 'REJECTED',
+        bypass: null,
         delay: 0,
         took: 0
       }));
     }
   }, {
     key: "pushVisit",
-    value: function pushVisit(req, res, queuems, startms, closems) {
+    value: function pushVisit(_ref2) {
+      var req = _ref2.req,
+        res = _ref2.res,
+        queuems = _ref2.queuems,
+        startms = _ref2.startms,
+        closems = _ref2.closems,
+        bypass = _ref2.bypass;
       var commons = this.visitCommons(req, res);
       var delay = startms - queuems;
       var took = closems - startms;
       this.visits.push(_objectSpread(_objectSpread({}, commons), {}, {
         status: 'ACCEPTED',
+        bypass: bypass,
         delay: delay,
         took: took
       }));
@@ -324,13 +326,13 @@ var TStatusLogs = /*#__PURE__*/function () {
 }();
 var TStatusPressure = /*#__PURE__*/function () {
   function TStatusPressure(rt) {
-    var _this5 = this;
+    var _this4 = this;
     _classCallCheck(this, TStatusPressure);
     _defineProperty(this, "rt", void 0);
     _defineProperty(this, "records", []);
     this.rt = rt;
     setInterval(function () {
-      return _this5.record();
+      return _this4.record();
     }, ms('1s'));
   }
   _createClass(TStatusPressure, [{
@@ -340,8 +342,8 @@ var TStatusPressure = /*#__PURE__*/function () {
         return !t.started;
       });
       var timestamp = new Date().getTime();
-      var queueing = this.rt.traffics.length;
-      var waitTime = oldest ? new Date().getTime() - oldest.queuems : 0;
+      var queueing = this.rt.traffics.length + this.rt.bypassTraffics.length;
+      var waitTime = oldest ? timestamp - oldest.queuems : 0;
       this.records.unshift({
         timestamp: timestamp,
         queueing: queueing,
@@ -430,7 +432,11 @@ var TStatusTraffics = /*#__PURE__*/function () {
   }
   _createClass(TStatusTraffics, [{
     key: "pushServed",
-    value: function pushServed(req, res, startms, closems) {
+    value: function pushServed(_ref3) {
+      var req = _ref3.req,
+        res = _ref3.res,
+        startms = _ref3.startms,
+        closems = _ref3.closems;
       ++this.served;
       var routename = this.getRoute(req);
       if (!routename) return this.unknowns.push(req.originalUrl);
@@ -461,10 +467,10 @@ var TStatusTraffics = /*#__PURE__*/function () {
       var served = this.served,
         lost = this.lost,
         bypassed = this.bypassed;
-      var rs = Object.entries(this.routes).map(function (_ref2) {
-        var _ref3 = _slicedToArray(_ref2, 2),
-          _ = _ref3[0],
-          route = _ref3[1];
+      var rs = Object.entries(this.routes).map(function (_ref4) {
+        var _ref5 = _slicedToArray(_ref4, 2),
+          _ = _ref5[0],
+          route = _ref5[1];
         return route;
       });
       var counts = rs.reduce(function (a, b) {
@@ -519,14 +525,14 @@ var TrafficStatus = /*#__PURE__*/function () {
     value: function onQueue() {}
   }, {
     key: "onStart",
-    value: function onStart(queuems, startms) {
-      this.delay.push(queuems, startms);
+    value: function onStart(traffic) {
+      this.delay.push(traffic);
     }
   }, {
     key: "onClose",
-    value: function onClose(req, res, queuems, startms, closems) {
-      this.traffics.pushServed(req, res, startms, closems);
-      this.logs.pushVisit(req, res, queuems, startms, closems);
+    value: function onClose(traffic) {
+      this.traffics.pushServed(traffic);
+      this.logs.pushVisit(traffic);
     }
   }, {
     key: "getStatus",
@@ -544,15 +550,16 @@ var RouteTraffics = /*#__PURE__*/function (_TrafficOpts) {
   _inherits(RouteTraffics, _TrafficOpts);
   var _super = _createSuper(RouteTraffics);
   function RouteTraffics() {
-    var _this6;
+    var _this5;
     _classCallCheck(this, RouteTraffics);
     for (var _len = arguments.length, args = new Array(_len), _key = 0; _key < _len; _key++) {
       args[_key] = arguments[_key];
     }
-    _this6 = _super.call.apply(_super, [this].concat(args));
-    _defineProperty(_assertThisInitialized(_this6), "traffics", []);
-    _defineProperty(_assertThisInitialized(_this6), "status", void 0);
-    return _this6;
+    _this5 = _super.call.apply(_super, [this].concat(args));
+    _defineProperty(_assertThisInitialized(_this5), "traffics", []);
+    _defineProperty(_assertThisInitialized(_this5), "bypassTraffics", []);
+    _defineProperty(_assertThisInitialized(_this5), "status", void 0);
+    return _this5;
   }
   _createClass(RouteTraffics, [{
     key: "begin",
@@ -568,7 +575,8 @@ var RouteTraffics = /*#__PURE__*/function (_TrafficOpts) {
   }, {
     key: "checkAccept",
     value: function checkAccept(props) {
-      if (this.traffics.length < this.maxQueue) return;
+      var totaltraffics = this.traffics.length + this.bypassTraffics.length;
+      if (totaltraffics < this.maxQueue) return;
       this.status.onReject(props.req, props.res);
       throw new common.NotAcceptableException();
     }
@@ -593,27 +601,36 @@ var RouteTraffics = /*#__PURE__*/function (_TrafficOpts) {
       if (this.checkExcludes(props)) return props.next();
       this.checkAccept(props);
       var bypass = this.checkBypass(props);
-      var traffic = new Traffic(this, props);
-      if (bypass) traffic.bypass();
-      this.traffics.push(traffic);
+      var traffic = new Traffic(this, props, {
+        bypass: bypass
+      });
+      if (bypass) this.bypassTraffics.push(traffic);else this.traffics.push(traffic);
       this.check();
     }
   }, {
     key: "check",
     value: function check() {
+      var _this6 = this;
       this.traffics = this.traffics.filter(function (t) {
         return !t.closed;
       });
-      var busycount = this.traffics.filter(function (t) {
-        return t.started && !t.unlocked;
-      }).length;
-      var allowed = Math.max(this.concurrency - busycount, 0);
-      if (!allowed) return;
-      this.traffics.filter(function (t) {
-        return !t.started;
-      }).splice(0, allowed).forEach(function (t) {
-        return t.start();
+      this.bypassTraffics = this.bypassTraffics.filter(function (t) {
+        return !t.closed;
       });
+      var exec = function exec(traffics) {
+        var busycount = traffics.filter(function (t) {
+          return t.started && !t.unlocked;
+        }).length;
+        var allowed = Math.max(_this6.concurrency - busycount, 0);
+        if (!allowed) return;
+        traffics.filter(function (t) {
+          return !t.started;
+        }).splice(0, allowed).forEach(function (t) {
+          return t.start();
+        });
+      };
+      exec(this.traffics);
+      exec(this.bypassTraffics);
     }
   }]);
   return RouteTraffics;

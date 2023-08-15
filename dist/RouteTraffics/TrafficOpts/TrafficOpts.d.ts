@@ -5,6 +5,7 @@ export interface RouteTrafficsOpts {
     concurrency?: number;
     maxQueue?: number;
     unlockTimeout?: number | string;
+    bypassUnlockTimeout?: number | string;
     forceCloseTimeout?: number | string;
     excludes?: string[];
     bypass?: string[];
@@ -22,6 +23,7 @@ export declare class TrafficOpts {
     get concurrency(): number;
     get maxQueue(): number;
     get unlockTimeout(): string | number;
+    get bypassUnlockTimeout(): string | number;
     get forceCloseTimeout(): string | number;
     get excludes(): string[];
     get bypass(): string[];

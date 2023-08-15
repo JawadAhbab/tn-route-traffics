@@ -21,6 +21,7 @@ export type TrafficDumpVisit<Extras extends {} = {}> = Extras & {
   graphql: boolean
   route: string | null
   url: string
+  bypass: boolean | null
   userip: string
   delay: number
   took: number
