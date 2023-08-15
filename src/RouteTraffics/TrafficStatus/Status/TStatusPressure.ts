@@ -1,10 +1,18 @@
 import ms from 'ms'
 import { RouteTraffics } from '../../RouteTraffics'
-type Record = { timestamp: number; queueing: number; waitTime: number }
+export interface TSPressureRecord {
+  timestamp: number
+  waitTime: number
+  queueing: {
+    regular: number
+    bypass: number
+    total: number
+  }
+}
 
 export class TStatusPressure {
   private rt: RouteTraffics
-  private records: Record[] = []
+  private records: TSPressureRecord[] = []
   constructor(rt: RouteTraffics) {
     this.rt = rt
     setInterval(() => this.record(), ms('1s'))
@@ -13,9 +21,11 @@ export class TStatusPressure {
   private record() {
     const oldest = this.rt.traffics.find(t => !t.started)
     const timestamp = new Date().getTime()
-    const queueing = this.rt.traffics.length + this.rt.bypassTraffics.length
     const waitTime = oldest ? timestamp - oldest.queuems : 0
-    this.records.unshift({ timestamp, queueing, waitTime })
+    const regular = this.rt.traffics.length
+    const bypass = this.rt.bypassTraffics.length
+    const total = regular + bypass
+    this.records.unshift({ timestamp, waitTime, queueing: { regular, bypass, total } })
     this.records.splice(300)
   }
 

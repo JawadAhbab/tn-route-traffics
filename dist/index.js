@@ -255,7 +255,7 @@ var TStatusLogs = /*#__PURE__*/function () {
         timestamp: new Date().getTime()
       }, this.rt.logDumpExtras.pressure()), {}, {
         queuePerSec: records.reduce(function (a, b) {
-          return a + b.queueing;
+          return a + b.queueing.total;
         }, 0) / records.length,
         aveWaitTime: records.reduce(function (a, b) {
           return a + b.waitTime;
@@ -342,12 +342,18 @@ var TStatusPressure = /*#__PURE__*/function () {
         return !t.started;
       });
       var timestamp = new Date().getTime();
-      var queueing = this.rt.traffics.length + this.rt.bypassTraffics.length;
       var waitTime = oldest ? timestamp - oldest.queuems : 0;
+      var regular = this.rt.traffics.length;
+      var bypass = this.rt.bypassTraffics.length;
+      var total = regular + bypass;
       this.records.unshift({
         timestamp: timestamp,
-        queueing: queueing,
-        waitTime: waitTime
+        waitTime: waitTime,
+        queueing: {
+          regular: regular,
+          bypass: bypass,
+          total: total
+        }
       });
       this.records.splice(300);
     }

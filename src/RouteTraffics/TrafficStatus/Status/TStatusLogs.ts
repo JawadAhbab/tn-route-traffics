@@ -33,7 +33,7 @@ export class TStatusLogs {
       id: uniqueID(),
       timestamp: new Date().getTime(),
       ...this.rt.logDumpExtras.pressure(),
-      queuePerSec: records.reduce((a, b) => a + b.queueing, 0) / records.length,
+      queuePerSec: records.reduce((a, b) => a + b.queueing.total, 0) / records.length,
       aveWaitTime: records.reduce((a, b) => a + b.waitTime, 0) / records.length,
     })
   }

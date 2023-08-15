@@ -1,14 +1,17 @@
 import { RouteTraffics } from '../../RouteTraffics';
-type Record = {
+export interface TSPressureRecord {
     timestamp: number;
-    queueing: number;
     waitTime: number;
-};
+    queueing: {
+        regular: number;
+        bypass: number;
+        total: number;
+    };
+}
 export declare class TStatusPressure {
     private rt;
     private records;
     constructor(rt: RouteTraffics);
     private record;
-    getStatus(): Record[];
+    getStatus(): TSPressureRecord[];
 }
-export {};
