@@ -5,6 +5,7 @@ import { TStatusDelay } from './Status/TStatusDelay'
 import { TStatusLogs } from './Status/TStatusLogs'
 import { TStatusPressure } from './Status/TStatusPressure'
 import { TStatusTraffics } from './Status/TStatusTraffics'
+import { Traffic } from '../Traffic/Traffic'
 
 export class TrafficStatus {
   private logs: TStatusLogs
@@ -25,12 +26,12 @@ export class TrafficStatus {
     this.traffics.pushBypass()
   }
   public onQueue() {}
-  public onStart(queuems: number, startms: number) {
-    this.delay.push(queuems, startms)
+  public onStart(traffic: Traffic) {
+    this.delay.push(traffic)
   }
-  public onClose(req: Request, res: Response, queuems: number, startms: number, closems: number) {
-    this.traffics.pushServed(req, res, startms, closems)
-    this.logs.pushVisit(req, res, queuems, startms, closems)
+  public onClose(traffic: Traffic) {
+    this.traffics.pushServed(traffic)
+    this.logs.pushVisit(traffic)
   }
 
   public getStatus() {

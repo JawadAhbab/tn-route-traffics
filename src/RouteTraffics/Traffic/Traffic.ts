@@ -9,8 +9,8 @@ export class Traffic {
   public queuems = new Date().getTime()
   public startms!: number
   public closems!: number
-  private req: Request
-  private res: Response
+  public req: Request
+  public res: Response
   private next: Func
   constructor(rt: RouteTraffics, { req, res, next }: TrafficProps) {
     this.rt = rt
@@ -31,16 +31,17 @@ export class Traffic {
     this.startms = new Date().getTime()
     this.started = true
     this.next()
-    this.rt.status.onStart(this.queuems, this.startms)
+    this.rt.status.onStart(this)
     this.timeouts.push(setTimeout(() => this.unlock(), getMs(this.rt.unlockTimeout)))
     this.timeouts.push(setTimeout(() => this.close(), getMs(this.rt.forceCloseTimeout)))
   }
   public bypass() {
+    if (this.started) return
     this.startms = new Date().getTime()
     this.started = true
     this.unlocked = true
     this.next()
-    this.rt.status.onStart(this.queuems, this.startms)
+    this.rt.status.onStart(this)
     this.timeouts.push(setTimeout(() => this.close(), getMs(this.rt.forceCloseTimeout)))
   }
 
@@ -53,7 +54,7 @@ export class Traffic {
     if (this.closed) return
     this.closems = new Date().getTime()
     this.closed = true
-    this.rt.status.onClose(this.req, this.res, this.queuems, this.startms, this.closems)
+    this.rt.status.onClose(this)
     this.rt.check()
     this.timeouts.forEach(timeout => clearTimeout(timeout))
   }

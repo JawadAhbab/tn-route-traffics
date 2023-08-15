@@ -5,6 +5,7 @@ import { getMs } from '../../../accessories/getMs'
 import { uniqueID } from '../../../accessories/uniqueID'
 import { RouteTraffics } from '../../RouteTraffics'
 import { TrafficDumpPressure, TrafficDumpVisit } from '../../TrafficDump/TrafficDump'
+import { Traffic } from '../../Traffic/Traffic'
 
 export class TStatusLogs {
   private rt: RouteTraffics
@@ -66,7 +67,7 @@ export class TStatusLogs {
     const commons = this.visitCommons(req, res)
     this.visits.push({ ...commons, status: 'REJECTED', delay: 0, took: 0 })
   }
-  public pushVisit(req: Request, res: Response, queuems: number, startms: number, closems: number) {
+  public pushVisit({ req, res, queuems, startms, closems }: Traffic) {
     const commons = this.visitCommons(req, res)
     const delay = startms - queuems
     const took = closems - startms

@@ -1,10 +1,12 @@
+import { Traffic } from '../../Traffic/Traffic'
+
 export class TStatusDelay {
   private startCount = 0
   private delayCount = 0
   private delayMax = 0
   private delayTotal = 0
 
-  public push(queuems: number, startms: number) {
+  public push({ queuems, startms }: Traffic) {
     this.startCount += 1
     const delay = startms - queuems
     if (delay > 100) {

@@ -1,5 +1,6 @@
-import { Request, Response } from 'express'
+import { Request } from 'express'
 import { AnyObject, ObjectOf } from 'tn-typescript'
+import { Traffic } from '../../Traffic/Traffic'
 
 class Route {
   public route: string
@@ -58,7 +59,7 @@ export class TStatusTraffics {
   private routes: ObjectOf<Route> = {}
   private unknowns = new Unknowns()
 
-  public pushServed(req: Request, res: Response, startms: number, closems: number) {
+  public pushServed({ req, res, startms, closems }: Traffic) {
     ++this.served
     const routename = this.getRoute(req)
     if (!routename) return this.unknowns.push(req.originalUrl)
